@@ -32,6 +32,7 @@ function Dashboard() {
   const [activeMeal, setActiveMeal] = useState<MealType>("breakfast");
   const [foodOpen, setFoodOpen] = useState(false);
   const [waterOpen, setWaterOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [displayName, setDisplayName] = useState("there");
 
   useEffect(() => {
