@@ -228,7 +228,63 @@ function Dashboard() {
         <ChevronRight color="#b7c6c2" className="shrink-0" />
       </button>
 
+      {/* Day overview — all meal sections at a glance */}
+      <section className="mx-5 mt-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-black text-charcoal">Today's Overview</h2>
+          <span className="text-label" style={{ color: "#b7c6c2" }}>
+            {Math.round(store.totals.calories)} / {store.goals.calories} kcal
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {MEALS.map((m) => {
+            const items = store.meals.filter((x) => x.meal_type === m);
+            const kcal = items.reduce((a, b) => a + Number(b.calories), 0);
+            const active = m === activeMeal;
+            return (
+              <button
+                key={m}
+                onClick={() => setActiveMeal(m)}
+                className="flex items-center gap-2.5 rounded-2xl p-2.5 text-left transition-colors"
+                style={{
+                  backgroundColor: active ? "#171e19" : "#ffffff",
+                  border: active ? "none" : "1px solid rgba(183,198,194,0.5)",
+                }}
+              >
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
+                  style={{ backgroundColor: active ? "#ca0013" : "rgba(202,0,19,0.1)" }}
+                >
+                  {MEAL_EMOJI[m]}
+                </div>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-wider"
+                    style={{ color: active ? "rgba(255,255,255,0.6)" : "#b7c6c2" }}
+                  >
+                    {MEAL_LABELS[m]}
+                  </p>
+                  <p
+                    className="text-sm font-extrabold"
+                    style={{ color: active ? "#ffffff" : "#171e19" }}
+                  >
+                    {Math.round(kcal)} kcal
+                  </p>
+                  <p
+                    className="text-[10px] font-bold"
+                    style={{ color: active ? "rgba(255,255,255,0.6)" : "#b7c6c2" }}
+                  >
+                    {items.length} {items.length === 1 ? "item" : "items"}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Active meal feed */}
+
       <section className="mx-5 mt-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-black text-charcoal">
