@@ -68,6 +68,13 @@ function Dashboard() {
         </div>
         <div className="ml-3 flex shrink-0 items-center gap-2">
           <Link
+            to="/weekly"
+            aria-label="Weekly summary"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border"
+          >
+            <TrendingUp size={18} />
+          </Link>
+          <Link
             to="/goals"
             aria-label="Goals"
             className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border"
