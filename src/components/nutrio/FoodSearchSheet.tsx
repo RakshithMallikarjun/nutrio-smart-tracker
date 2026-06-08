@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { X, Search, Plus } from "lucide-react";
-import { FOOD_DB, MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
+import { FOOD_DB, FOOD_CATEGORIES, MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 
 type Props = {
   open: boolean;
@@ -11,12 +11,16 @@ type Props = {
 export function FoodSearchSheet({ open, onClose, onAdd }: Props) {
   const [q, setQ] = useState("");
   const [meal, setMeal] = useState<MealType>("breakfast");
+  const [cat, setCat] = useState<string>("All");
 
   const results = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return FOOD_DB;
-    return FOOD_DB.filter((f) => f.name.toLowerCase().includes(term));
-  }, [q]);
+    return FOOD_DB.filter((f) => {
+      if (cat !== "All" && f.category !== cat) return false;
+      if (term && !f.name.toLowerCase().includes(term) && !f.category.toLowerCase().includes(term)) return false;
+      return true;
+    }).slice(0, 100);
+  }, [q, cat]);
 
   if (!open) return null;
 
@@ -60,16 +64,38 @@ export function FoodSearchSheet({ open, onClose, onAdd }: Props) {
         </div>
 
         {/* Search input */}
-        <div className="relative mb-4">
+        <div className="relative mb-3">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2" color="#b7c6c2" />
           <input
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search foods…"
+            placeholder="Search 200+ Indian foods…"
             className="w-full rounded-2xl bg-cream py-3 pl-11 pr-4 text-base font-semibold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
           />
         </div>
+
+        {/* Category chips */}
+        <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
+          {["All", ...FOOD_CATEGORIES].map((c) => {
+            const active = c === cat;
+            return (
+              <button
+                key={c}
+                onClick={() => setCat(c)}
+                className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider transition-colors"
+                style={{
+                  backgroundColor: active ? "#ca0013" : "#ffffff",
+                  color: active ? "#ffffff" : "#171e19",
+                  border: active ? "none" : "1px solid rgba(183,198,194,0.5)",
+                }}
+              >
+                {c}
+              </button>
+            );
+          })}
+        </div>
+
 
         {/* Results */}
         <div className="flex-1 space-y-2 overflow-y-auto">
@@ -80,6 +106,9 @@ export function FoodSearchSheet({ open, onClose, onAdd }: Props) {
             >
               <div className="min-w-0">
                 <p className="truncate text-base font-extrabold text-charcoal">{f.name}</p>
+                <p className="truncate text-[10px] font-bold uppercase tracking-wider" style={{ color: "#ca0013" }}>
+                  {f.category}
+                </p>
                 <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>
                   {f.serving} · {f.calories} kcal · P{f.protein} C{f.carbs} F{f.fat}
                 </p>
