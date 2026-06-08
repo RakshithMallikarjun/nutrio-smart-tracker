@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, ClientOnly } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Flame, Droplet, TrendingUp } from "lucide-react";
 import {
@@ -14,6 +14,8 @@ import {
   Line,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+
+
 
 export const Route = createFileRoute("/_authenticated/weekly")({
   head: () => ({
@@ -163,21 +165,23 @@ function WeeklyPage() {
               </span>
             </div>
             <div className="h-44">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={days} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
-                  <CartesianGrid stroke="#eeebe3" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    cursor={{ fill: "rgba(183,198,194,0.15)" }}
-                    contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }}
-                  />
-                  {goals && (
-                    <ReferenceLine y={goals.calories} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
-                  )}
-                  <Bar dataKey="calories" fill="#171e19" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ClientOnly fallback={<ChartFallback />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={days} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
+                    <CartesianGrid stroke="#eeebe3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      cursor={{ fill: "rgba(183,198,194,0.15)" }}
+                      contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }}
+                    />
+                    {goals && (
+                      <ReferenceLine y={goals.calories} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
+                    )}
+                    <Bar dataKey="calories" fill="#171e19" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ClientOnly>
             </div>
             {goals && (
               <ProgressRow label="Goal progress" value={progress(totals.avgCalories, goals.calories)} unit={`${totals.avgCalories} / ${goals.calories} kcal`} />
@@ -191,18 +195,20 @@ function WeeklyPage() {
               <h2 className="text-base font-black text-charcoal">Macros</h2>
             </div>
             <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={days} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                  <CartesianGrid stroke="#eeebe3" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
-                  <Line type="monotone" dataKey="protein" stroke="#ca0013" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="carbs" stroke="#171e19" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="fat" stroke="#b7c6c2" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="fiber" stroke="#7a9990" strokeWidth={2.5} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
+              <ClientOnly fallback={<ChartFallback />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={days} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                    <CartesianGrid stroke="#eeebe3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
+                    <Line type="monotone" dataKey="protein" stroke="#ca0013" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="carbs" stroke="#171e19" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="fat" stroke="#b7c6c2" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="fiber" stroke="#7a9990" strokeWidth={2.5} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ClientOnly>
             </div>
             <div className="mt-2 flex flex-wrap gap-3 text-[11px] font-extrabold">
               <LegendDot color="#ca0013" label={`Protein ${totals.avgProtein}g`} />
@@ -230,18 +236,20 @@ function WeeklyPage() {
               </span>
             </div>
             <div className="h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={days.map((d) => ({ ...d, waterL: +(d.water / 1000).toFixed(2) }))} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
-                  <CartesianGrid stroke="#eeebe3" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
-                  {goals && (
-                    <ReferenceLine y={goals.water_ml / 1000} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
-                  )}
-                  <Bar dataKey="waterL" fill="#ca0013" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ClientOnly fallback={<ChartFallback />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={days.map((d) => ({ ...d, waterL: +(d.water / 1000).toFixed(2) }))} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
+                    <CartesianGrid stroke="#eeebe3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
+                    {goals && (
+                      <ReferenceLine y={goals.water_ml / 1000} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
+                    )}
+                    <Bar dataKey="waterL" fill="#ca0013" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ClientOnly>
             </div>
             {goals && (
               <ProgressRow
@@ -255,6 +263,10 @@ function WeeklyPage() {
       )}
     </div>
   );
+}
+
+function ChartFallback() {
+  return <div className="h-full w-full animate-pulse rounded-2xl bg-cream" />;
 }
 
 function LegendDot({ color, label }: { color: string; label: string }) {
