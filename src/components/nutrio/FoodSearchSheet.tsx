@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { X, Search, Plus } from "lucide-react";
-import { FOOD_DB, FOOD_CATEGORIES, MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
+import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 
 type Props = {
   open: boolean;
@@ -12,15 +12,24 @@ export function FoodSearchSheet({ open, onClose, onAdd }: Props) {
   const [q, setQ] = useState("");
   const [meal, setMeal] = useState<MealType>("breakfast");
   const [cat, setCat] = useState<string>("All");
+  const [foodDb, setFoodDb] = useState<Food[]>([]);
+  const [foodCategories, setFoodCategories] = useState<string[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    import("@/lib/nutrio-data").then(({ FOOD_DB, FOOD_CATEGORIES }) => {
+      setFoodDb(FOOD_DB);
+      setFoodCategories(FOOD_CATEGORIES);
+    });
+  }, [open]);
 
   const results = useMemo(() => {
     const term = q.trim().toLowerCase();
-    return FOOD_DB.filter((f) => {
+    return foodDb.filter((f) => {
       if (cat !== "All" && f.category !== cat) return false;
       if (term && !f.name.toLowerCase().includes(term) && !f.category.toLowerCase().includes(term)) return false;
       return true;
-    }).slice(0, 100);
-  }, [q, cat]);
+    }).slice(0, 30);
+  }, [q, cat, foodDb]);
 
   if (!open) return null;
 
@@ -77,7 +86,7 @@ export function FoodSearchSheet({ open, onClose, onAdd }: Props) {
 
         {/* Category chips */}
         <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
-          {["All", ...FOOD_CATEGORIES].map((c) => {
+          {["All", ...foodCategories].map((c) => {
             const active = c === cat;
             return (
               <button
@@ -129,6 +138,11 @@ export function FoodSearchSheet({ open, onClose, onAdd }: Props) {
           {results.length === 0 && (
             <p className="py-8 text-center text-sm font-bold" style={{ color: "#b7c6c2" }}>
               No foods found. Try another search.
+            </p>
+          )}
+          {results.length === 30 && (
+            <p className="py-4 text-center text-xs font-bold" style={{ color: "#b7c6c2" }}>
+              Showing top 30 — type more to narrow down.
             </p>
           )}
         </div>
