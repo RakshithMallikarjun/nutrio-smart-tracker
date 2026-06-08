@@ -236,18 +236,20 @@ function WeeklyPage() {
               </span>
             </div>
             <div className="h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={days.map((d) => ({ ...d, waterL: +(d.water / 1000).toFixed(2) }))} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
-                  <CartesianGrid stroke="#eeebe3" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
-                  {goals && (
-                    <ReferenceLine y={goals.water_ml / 1000} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
-                  )}
-                  <Bar dataKey="waterL" fill="#ca0013" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ClientOnly fallback={<ChartFallback />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={days.map((d) => ({ ...d, waterL: +(d.water / 1000).toFixed(2) }))} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
+                    <CartesianGrid stroke="#eeebe3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
+                    {goals && (
+                      <ReferenceLine y={goals.water_ml / 1000} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
+                    )}
+                    <Bar dataKey="waterL" fill="#ca0013" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ClientOnly>
             </div>
             {goals && (
               <ProgressRow
