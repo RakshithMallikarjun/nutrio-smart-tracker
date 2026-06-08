@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Flame, Droplet, Trash2, Sparkles, ChevronRight, Settings, LogOut } from "lucide-react";
+import { Bell, Flame, Droplet, Trash2, Sparkles, ChevronRight, Settings, LogOut, TrendingUp, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
@@ -9,6 +9,7 @@ import { MacroBar } from "@/components/nutrio/MacroBar";
 import { BottomNav, type Tab } from "@/components/nutrio/BottomNav";
 import { FoodSearchSheet } from "@/components/nutrio/FoodSearchSheet";
 import { WaterSheet } from "@/components/nutrio/WaterSheet";
+import { AiPhotoSheet } from "@/components/nutrio/AiPhotoSheet";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -31,6 +32,7 @@ function Dashboard() {
   const [activeMeal, setActiveMeal] = useState<MealType>("breakfast");
   const [foodOpen, setFoodOpen] = useState(false);
   const [waterOpen, setWaterOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [displayName, setDisplayName] = useState("there");
 
   useEffect(() => {
@@ -65,6 +67,13 @@ function Dashboard() {
           </h1>
         </div>
         <div className="ml-3 flex shrink-0 items-center gap-2">
+          <Link
+            to="/weekly"
+            aria-label="Weekly summary"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border"
+          >
+            <TrendingUp size={18} />
+          </Link>
           <Link
             to="/goals"
             aria-label="Goals"
@@ -226,13 +235,22 @@ function Dashboard() {
             {MEAL_LABELS[activeMeal]}
             <span className="ml-1.5 text-sm" style={{ color: "#b7c6c2" }}>· {mealsForActive.length}</span>
           </h2>
-          <button
-            onClick={() => setFoodOpen(true)}
-            className="text-label"
-            style={{ color: "#ca0013" }}
-          >
-            + Add
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAiOpen(true)}
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white"
+              style={{ backgroundColor: "#ca0013" }}
+            >
+              <Camera size={13} /> Scan
+            </button>
+            <button
+              onClick={() => setFoodOpen(true)}
+              className="text-label"
+              style={{ color: "#ca0013" }}
+            >
+              + Add
+            </button>
+          </div>
         </div>
 
         {mealsForActive.length === 0 ? (
@@ -302,6 +320,15 @@ function Dashboard() {
         goal={store.goals.water_ml}
         onAdd={store.addWater}
         onUndo={store.undoWater}
+      />
+
+      <AiPhotoSheet
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        onAdd={(food, meal) => {
+          store.addFood(food, meal);
+          setActiveMeal(meal);
+        }}
       />
     </div>
   );
