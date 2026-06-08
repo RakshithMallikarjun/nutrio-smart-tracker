@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Bell, Flame, Droplet, Trash2, Sparkles, ChevronRight, Settings, LogOut, TrendingUp, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
@@ -33,23 +33,15 @@ function Dashboard() {
   const [foodOpen, setFoodOpen] = useState(false);
   const [waterOpen, setWaterOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  const [displayName, setDisplayName] = useState("there");
-
-  useEffect(() => {
-    if (!user?.id) return;
-    supabase.from("profiles").select("name").eq("id", user.id).maybeSingle().then(({ data }) => {
-      if (data?.name) setDisplayName(data.name.split(" ")[0]);
-    });
-  }, [user?.id]);
 
   const remaining = Math.max(0, store.goals.calories - store.totals.calories);
-  const mealsForActive = useMemo(
-    () => store.meals.filter((m) => m.meal_type === activeMeal),
-    [store.meals, activeMeal],
-  );
-
-  const mealCalories = (m: MealType) =>
-    store.meals.filter((x) => x.meal_type === m).reduce((a, b) => a + Number(b.calories), 0);
+  const mealMap = useMemo(() => {
+    const map = new Map<MealType, typeof store.meals>();
+    (["breakfast", "lunch", "dinner", "snack"] as MealType[]).forEach((m) => map.set(m, []));
+    store.meals.forEach((entry) => map.get(entry.meal_type)?.push(entry));
+    return map;
+  }, [store.meals]);
+  const mealsForActive = mealMap.get(activeMeal) ?? [];
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -63,7 +55,7 @@ function Dashboard() {
         <div className="min-w-0 flex-1">
           <p className="text-label" style={{ color: "#b7c6c2" }}>Good morning</p>
           <h1 className="mt-1 truncate text-[26px] font-black leading-tight text-charcoal">
-            Hello, {displayName}
+            Hello, {store.displayName}
           </h1>
         </div>
         <div className="ml-3 flex shrink-0 items-center gap-2">
@@ -93,7 +85,7 @@ function Dashboard() {
               className="flex h-11 w-11 items-center justify-center rounded-full text-base font-black text-white"
               style={{ backgroundColor: "#171e19", border: "2px solid #ffffff" }}
             >
-              {displayName.charAt(0).toUpperCase()}
+              {store.displayName.charAt(0).toUpperCase()}
             </div>
             <div
               className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full"
@@ -109,7 +101,7 @@ function Dashboard() {
       <div className="mt-5 flex gap-2.5 overflow-x-auto px-5 pb-2" style={{ scrollSnapType: "x mandatory" }}>
         {MEALS.map((m) => {
           const active = m === activeMeal;
-          const kcal = mealCalories(m);
+          const kcal = (mealMap.get(m) ?? []).reduce((a, b) => a + Number(b.calories), 0);
           if (active) {
             return (
               <button

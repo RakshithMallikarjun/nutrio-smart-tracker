@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { MealType, Food } from "@/lib/nutrio-data";
+import { useMemo } from "react";
 
 export type Goals = {
   calories: number;
@@ -31,85 +32,142 @@ const DEFAULT_GOALS: Goals = {
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function useNutrioCloud(userId: string | undefined) {
-  const [goals, setGoalsState] = useState<Goals>(DEFAULT_GOALS);
-  const [meals, setMeals] = useState<MealRow[]>([]);
-  const [water, setWater] = useState<{ id: string; quantity_ml: number }[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const qc = useQueryClient();
+  const date = today();
 
-  const refresh = useCallback(async () => {
-    if (!userId) return;
-    const date = today();
-    const [g, m, w] = await Promise.all([
-      supabase.from("goals").select("*").eq("user_id", userId).maybeSingle(),
-      supabase.from("meal_entries").select("*").eq("user_id", userId).eq("log_date", date).order("logged_at", { ascending: true }),
-      supabase.from("water_entries").select("id,quantity_ml").eq("user_id", userId).eq("log_date", date),
-    ]);
-    if (g.data) {
-      setGoalsState({
-        calories: g.data.calories, protein: g.data.protein, carbs: g.data.carbs,
-        fat: g.data.fat, fiber: g.data.fiber, water_ml: g.data.water_ml,
-      });
-    }
-    if (m.data) setMeals(m.data as MealRow[]);
-    if (w.data) setWater(w.data);
-    setLoaded(true);
-  }, [userId]);
+  const { data: goals = DEFAULT_GOALS } = useQuery({
+    queryKey: ["goals", userId],
+    queryFn: async () => {
+      const { data } = await supabase.from("goals").select("*").eq("user_id", userId!).maybeSingle();
+      return data
+        ? { calories: data.calories, protein: data.protein, carbs: data.carbs, fat: data.fat, fiber: data.fiber, water_ml: data.water_ml }
+        : DEFAULT_GOALS;
+    },
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => { refresh(); }, [refresh]);
+  const { data: profile } = useQuery({
+    queryKey: ["profile", userId],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("name").eq("id", userId!).maybeSingle();
+      return data;
+    },
+    enabled: !!userId,
+    staleTime: 10 * 60 * 1000,
+  });
 
-  const addFood = useCallback(async (food: Food, mealType: MealType) => {
-    if (!userId) return;
-    const { data, error } = await supabase.from("meal_entries").insert({
-      user_id: userId,
-      food_name: food.name,
-      serving: food.serving,
-      calories: food.calories,
-      protein: food.protein,
-      carbs: food.carbs,
-      fat: food.fat,
-      fiber: food.fiber,
-      meal_type: mealType,
-    }).select().single();
-    if (!error && data) setMeals((prev) => [...prev, data as MealRow]);
-  }, [userId]);
+  const { data: meals = [] } = useQuery({
+    queryKey: ["meals", userId, date],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("meal_entries")
+        .select("*")
+        .eq("user_id", userId!)
+        .eq("log_date", date)
+        .order("logged_at", { ascending: true });
+      return (data ?? []) as MealRow[];
+    },
+    enabled: !!userId,
+  });
 
-  const removeMeal = useCallback(async (id: string) => {
-    setMeals((prev) => prev.filter((m) => m.id !== id));
-    await supabase.from("meal_entries").delete().eq("id", id);
-  }, []);
+  const { data: water = [] } = useQuery({
+    queryKey: ["water", userId, date],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("water_entries")
+        .select("id,quantity_ml")
+        .eq("user_id", userId!)
+        .eq("log_date", date);
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
 
-  const addWater = useCallback(async (ml: number) => {
-    if (!userId) return;
-    const { data } = await supabase.from("water_entries").insert({
-      user_id: userId, quantity_ml: ml,
-    }).select("id,quantity_ml").single();
-    if (data) setWater((prev) => [...prev, data]);
-  }, [userId]);
+  const addFoodMutation = useMutation({
+    mutationFn: async ({ food, mealType }: { food: Food; mealType: MealType }) => {
+      const { data, error } = await supabase.from("meal_entries").insert({
+        user_id: userId, food_name: food.name, serving: food.serving,
+        calories: food.calories, protein: food.protein, carbs: food.carbs,
+        fat: food.fat, fiber: food.fiber, meal_type: mealType,
+      }).select().single();
+      if (error) throw error;
+      return data as MealRow;
+    },
+    onSuccess: (newRow) => {
+      qc.setQueryData<MealRow[]>(["meals", userId, date], (prev = []) => [...prev, newRow]);
+    },
+  });
 
-  const undoWater = useCallback(async () => {
-    const last = water[water.length - 1];
-    if (!last) return;
-    setWater((prev) => prev.slice(0, -1));
-    await supabase.from("water_entries").delete().eq("id", last.id);
-  }, [water]);
+  const removeMealMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("meal_entries").delete().eq("id", id);
+    },
+    onMutate: async (id) => {
+      qc.setQueryData<MealRow[]>(["meals", userId, date], (prev = []) => prev.filter((m) => m.id !== id));
+    },
+  });
 
-  const setGoals = useCallback(async (next: Goals) => {
-    if (!userId) return;
-    setGoalsState(next);
-    await supabase.from("goals").upsert({ user_id: userId, ...next, updated_at: new Date().toISOString() });
-  }, [userId]);
+  const addWaterMutation = useMutation({
+    mutationFn: async (ml: number) => {
+      const { data } = await supabase.from("water_entries").insert({ user_id: userId, quantity_ml: ml }).select("id,quantity_ml").single();
+      return data!;
+    },
+    onSuccess: (row) => {
+      qc.setQueryData<typeof water>(["water", userId, date], (prev = []) => [...prev, row]);
+    },
+  });
 
-  const totals = meals.reduce(
-    (a, m) => ({
-      calories: a.calories + Number(m.calories),
-      protein: a.protein + Number(m.protein),
-      carbs: a.carbs + Number(m.carbs),
-      fat: a.fat + Number(m.fat),
-      fiber: a.fiber + Number(m.fiber),
-    }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+  const undoWaterMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("water_entries").delete().eq("id", id);
+    },
+    onMutate: async (id) => {
+      qc.setQueryData<typeof water>(["water", userId, date], (prev = []) => prev.filter((w) => w.id !== id));
+    },
+  });
+
+  const setGoalsMutation = useMutation({
+    mutationFn: async (next: Goals) => {
+      await supabase.from("goals").upsert({ user_id: userId, ...next, updated_at: new Date().toISOString() });
+      return next;
+    },
+    onSuccess: (next) => {
+      qc.setQueryData(["goals", userId], next);
+    },
+  });
+
+  const totals = useMemo(
+    () =>
+      meals.reduce(
+        (a, m) => ({
+          calories: a.calories + Number(m.calories),
+          protein: a.protein + Number(m.protein),
+          carbs: a.carbs + Number(m.carbs),
+          fat: a.fat + Number(m.fat),
+          fiber: a.fiber + Number(m.fiber),
+        }),
+        { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      ),
+    [meals],
   );
-  const waterTotal = water.reduce((a, b) => a + b.quantity_ml, 0);
 
-  return { goals, setGoals, meals, water, totals, waterTotal, addFood, removeMeal, addWater, undoWater, loaded };
+  const waterTotal = useMemo(() => water.reduce((a, b) => a + b.quantity_ml, 0), [water]);
+  const displayName = profile?.name ? profile.name.split(" ")[0] : "there";
+  const lastWater = water[water.length - 1];
+
+  return {
+    goals,
+    setGoals: setGoalsMutation.mutateAsync,
+    meals,
+    water,
+    totals,
+    waterTotal,
+    displayName,
+    addFood: (food: Food, mealType: MealType) => addFoodMutation.mutate({ food, mealType }),
+    removeMeal: (id: string) => removeMealMutation.mutate(id),
+    addWater: (ml: number) => addWaterMutation.mutate(ml),
+    undoWater: () => lastWater && undoWaterMutation.mutate(lastWater.id),
+    loaded: true,
+  };
 }

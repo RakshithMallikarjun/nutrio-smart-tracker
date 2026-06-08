@@ -19,7 +19,7 @@ function downscale(file: File): Promise<string> {
       const img = new Image();
       img.onerror = () => reject(new Error("Bad image"));
       img.onload = () => {
-        const maxDim = 1024;
+        const maxDim = 768;
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
@@ -28,7 +28,7 @@ function downscale(file: File): Promise<string> {
         canvas.height = h;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
       };
       img.src = reader.result as string;
     };
