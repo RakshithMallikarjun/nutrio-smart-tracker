@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { X, Search, Plus } from "lucide-react";
-import { FOOD_DB, MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
+import { FOOD_DB, FOOD_CATEGORIES, MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 
 type Props = {
   open: boolean;
@@ -11,12 +11,16 @@ type Props = {
 export function FoodSearchSheet({ open, onClose, onAdd }: Props) {
   const [q, setQ] = useState("");
   const [meal, setMeal] = useState<MealType>("breakfast");
+  const [cat, setCat] = useState<string>("All");
 
   const results = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return FOOD_DB;
-    return FOOD_DB.filter((f) => f.name.toLowerCase().includes(term));
-  }, [q]);
+    return FOOD_DB.filter((f) => {
+      if (cat !== "All" && f.category !== cat) return false;
+      if (term && !f.name.toLowerCase().includes(term) && !f.category.toLowerCase().includes(term)) return false;
+      return true;
+    }).slice(0, 100);
+  }, [q, cat]);
 
   if (!open) return null;
 
