@@ -195,18 +195,20 @@ function WeeklyPage() {
               <h2 className="text-base font-black text-charcoal">Macros</h2>
             </div>
             <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={days} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                  <CartesianGrid stroke="#eeebe3" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
-                  <Line type="monotone" dataKey="protein" stroke="#ca0013" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="carbs" stroke="#171e19" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="fat" stroke="#b7c6c2" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="fiber" stroke="#7a9990" strokeWidth={2.5} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
+              <ClientOnly fallback={<ChartFallback />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={days} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                    <CartesianGrid stroke="#eeebe3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
+                    <Line type="monotone" dataKey="protein" stroke="#ca0013" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="carbs" stroke="#171e19" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="fat" stroke="#b7c6c2" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="fiber" stroke="#7a9990" strokeWidth={2.5} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ClientOnly>
             </div>
             <div className="mt-2 flex flex-wrap gap-3 text-[11px] font-extrabold">
               <LegendDot color="#ca0013" label={`Protein ${totals.avgProtein}g`} />
