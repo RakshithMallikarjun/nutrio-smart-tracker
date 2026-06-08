@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Flame, Droplet, Trash2, Sparkles, ChevronRight, Settings, LogOut } from "lucide-react";
+import { Bell, Flame, Droplet, Trash2, Sparkles, ChevronRight, Settings, LogOut, TrendingUp, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
@@ -9,6 +9,7 @@ import { MacroBar } from "@/components/nutrio/MacroBar";
 import { BottomNav, type Tab } from "@/components/nutrio/BottomNav";
 import { FoodSearchSheet } from "@/components/nutrio/FoodSearchSheet";
 import { WaterSheet } from "@/components/nutrio/WaterSheet";
+import { AiPhotoSheet } from "@/components/nutrio/AiPhotoSheet";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
