@@ -235,13 +235,22 @@ function Dashboard() {
             {MEAL_LABELS[activeMeal]}
             <span className="ml-1.5 text-sm" style={{ color: "#b7c6c2" }}>· {mealsForActive.length}</span>
           </h2>
-          <button
-            onClick={() => setFoodOpen(true)}
-            className="text-label"
-            style={{ color: "#ca0013" }}
-          >
-            + Add
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAiOpen(true)}
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white"
+              style={{ backgroundColor: "#ca0013" }}
+            >
+              <Camera size={13} /> Scan
+            </button>
+            <button
+              onClick={() => setFoodOpen(true)}
+              className="text-label"
+              style={{ color: "#ca0013" }}
+            >
+              + Add
+            </button>
+          </div>
         </div>
 
         {mealsForActive.length === 0 ? (
