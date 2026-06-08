@@ -1,9 +1,20 @@
 import { createFileRoute, Link, ClientOnly } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Flame, Droplet, TrendingUp } from "lucide-react";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ReferenceLine,
+  CartesianGrid,
+  LineChart,
+  Line,
+} from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 
-const Charts = lazy(() => import("@/components/nutrio/WeeklyCharts"));
 
 
 export const Route = createFileRoute("/_authenticated/weekly")({
