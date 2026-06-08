@@ -86,6 +86,7 @@ export function useNutrioCloud(userId: string | undefined) {
 
   const addFoodMutation = useMutation({
     mutationFn: async ({ food, mealType }: { food: Food; mealType: MealType }) => {
+      if (!userId) throw new Error("Unauthorized");
       const { data, error } = await supabase.from("meal_entries").insert({
         user_id: userId, food_name: food.name, serving: food.serving,
         calories: food.calories, protein: food.protein, carbs: food.carbs,
@@ -110,6 +111,7 @@ export function useNutrioCloud(userId: string | undefined) {
 
   const addWaterMutation = useMutation({
     mutationFn: async (ml: number) => {
+      if (!userId) throw new Error("Unauthorized");
       const { data } = await supabase.from("water_entries").insert({ user_id: userId, quantity_ml: ml }).select("id,quantity_ml").single();
       return data!;
     },
@@ -129,6 +131,7 @@ export function useNutrioCloud(userId: string | undefined) {
 
   const setGoalsMutation = useMutation({
     mutationFn: async (next: Goals) => {
+      if (!userId) throw new Error("Unauthorized");
       await supabase.from("goals").upsert({ user_id: userId, ...next, updated_at: new Date().toISOString() });
       return next;
     },
