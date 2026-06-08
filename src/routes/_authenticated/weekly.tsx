@@ -265,6 +265,10 @@ function WeeklyPage() {
   );
 }
 
+function ChartFallback() {
+  return <div className="h-full w-full animate-pulse rounded-2xl bg-cream" />;
+}
+
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-1.5 text-charcoal">
