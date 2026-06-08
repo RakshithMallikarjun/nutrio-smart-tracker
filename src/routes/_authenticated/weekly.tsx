@@ -1,27 +1,28 @@
-import { createFileRoute, Link, ClientOnly } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { lazy, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Flame, Droplet, TrendingUp } from "lucide-react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ReferenceLine,
-  CartesianGrid,
-  LineChart,
-  Line,
-} from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { SafeChart } from "@/components/nutrio/SafeChart";
 
-
+// Lazy-load recharts-backed chart components so they only download/execute on the client.
+const CaloriesChart = lazy(() =>
+  import("@/components/nutrio/WeeklyCharts").then((m) => ({ default: m.CaloriesChart })),
+);
+const MacrosChart = lazy(() =>
+  import("@/components/nutrio/WeeklyCharts").then((m) => ({ default: m.MacrosChart })),
+);
+const WaterChart = lazy(() =>
+  import("@/components/nutrio/WeeklyCharts").then((m) => ({ default: m.WaterChart })),
+);
 
 export const Route = createFileRoute("/_authenticated/weekly")({
   head: () => ({
     meta: [
       { title: "Weekly Summary — Nutrio" },
-      { name: "description", content: "7-day trends for calories, macros and water with goal progress." },
+      {
+        name: "description",
+        content: "7-day trends for calories, macros and water with goal progress.",
+      },
     ],
   }),
   component: WeeklyPage,
@@ -87,7 +88,16 @@ function WeeklyPage() {
       if (g.data) setGoals(g.data as Goals);
       const map: Record<string, DayRow> = {};
       for (const r of range) {
-        map[r.date] = { date: r.date, label: r.label, calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, water: 0 };
+        map[r.date] = {
+          date: r.date,
+          label: r.label,
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+          water: 0,
+        };
       }
       (m.data ?? []).forEach((r) => {
         const row = map[r.log_date];
@@ -134,7 +144,10 @@ function WeeklyPage() {
     goal > 0 ? Math.min(100, Math.round((avg / goal) * 100)) : 0;
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-md pb-16" style={{ backgroundColor: "#eeebe3" }}>
+    <div
+      className="mx-auto min-h-screen w-full max-w-md pb-16"
+      style={{ backgroundColor: "#eeebe3" }}
+    >
       <header className="flex items-center gap-3 px-5 pt-12">
         <Link
           to="/dashboard"
@@ -144,8 +157,12 @@ function WeeklyPage() {
           <ArrowLeft size={18} />
         </Link>
         <div className="min-w-0">
-          <p className="text-label" style={{ color: "#b7c6c2" }}>Last 7 days</p>
-          <h1 className="truncate text-[22px] font-black leading-tight text-charcoal">Weekly Summary</h1>
+          <p className="text-label" style={{ color: "#b7c6c2" }}>
+            Last 7 days
+          </p>
+          <h1 className="truncate text-[22px] font-black leading-tight text-charcoal">
+            Weekly Summary
+          </h1>
         </div>
       </header>
 
@@ -164,27 +181,15 @@ function WeeklyPage() {
                 Avg {totals.avgCalories} kcal
               </span>
             </div>
-            <div className="h-44">
-              <ClientOnly fallback={<ChartFallback />}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={days} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
-                    <CartesianGrid stroke="#eeebe3" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      cursor={{ fill: "rgba(183,198,194,0.15)" }}
-                      contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }}
-                    />
-                    {goals && (
-                      <ReferenceLine y={goals.calories} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
-                    )}
-                    <Bar dataKey="calories" fill="#171e19" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ClientOnly>
-            </div>
+            <SafeChart height={176}>
+              <CaloriesChart days={days} goal={goals?.calories} />
+            </SafeChart>
             {goals && (
-              <ProgressRow label="Goal progress" value={progress(totals.avgCalories, goals.calories)} unit={`${totals.avgCalories} / ${goals.calories} kcal`} />
+              <ProgressRow
+                label="Goal progress"
+                value={progress(totals.avgCalories, goals.calories)}
+                unit={`${totals.avgCalories} / ${goals.calories} kcal`}
+              />
             )}
           </section>
 
@@ -194,22 +199,9 @@ function WeeklyPage() {
               <TrendingUp size={16} color="#171e19" />
               <h2 className="text-base font-black text-charcoal">Macros</h2>
             </div>
-            <div className="h-48">
-              <ClientOnly fallback={<ChartFallback />}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={days} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                    <CartesianGrid stroke="#eeebe3" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
-                    <Line type="monotone" dataKey="protein" stroke="#ca0013" strokeWidth={2.5} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="carbs" stroke="#171e19" strokeWidth={2.5} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="fat" stroke="#b7c6c2" strokeWidth={2.5} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="fiber" stroke="#7a9990" strokeWidth={2.5} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ClientOnly>
-            </div>
+            <SafeChart height={192}>
+              <MacrosChart days={days} />
+            </SafeChart>
             <div className="mt-2 flex flex-wrap gap-3 text-[11px] font-extrabold">
               <LegendDot color="#ca0013" label={`Protein ${totals.avgProtein}g`} />
               <LegendDot color="#171e19" label={`Carbs ${totals.avgCarbs}g`} />
@@ -218,10 +210,30 @@ function WeeklyPage() {
             </div>
             {goals && (
               <div className="mt-4 space-y-2">
-                <ProgressRow label="Protein" value={progress(totals.avgProtein, goals.protein)} unit={`${totals.avgProtein} / ${goals.protein}g`} color="#ca0013" />
-                <ProgressRow label="Carbs" value={progress(totals.avgCarbs, goals.carbs)} unit={`${totals.avgCarbs} / ${goals.carbs}g`} color="#171e19" />
-                <ProgressRow label="Fat" value={progress(totals.avgFat, goals.fat)} unit={`${totals.avgFat} / ${goals.fat}g`} color="#b7c6c2" />
-                <ProgressRow label="Fiber" value={progress(totals.avgFiber, goals.fiber)} unit={`${totals.avgFiber} / ${goals.fiber}g`} color="#7a9990" />
+                <ProgressRow
+                  label="Protein"
+                  value={progress(totals.avgProtein, goals.protein)}
+                  unit={`${totals.avgProtein} / ${goals.protein}g`}
+                  color="#ca0013"
+                />
+                <ProgressRow
+                  label="Carbs"
+                  value={progress(totals.avgCarbs, goals.carbs)}
+                  unit={`${totals.avgCarbs} / ${goals.carbs}g`}
+                  color="#171e19"
+                />
+                <ProgressRow
+                  label="Fat"
+                  value={progress(totals.avgFat, goals.fat)}
+                  unit={`${totals.avgFat} / ${goals.fat}g`}
+                  color="#b7c6c2"
+                />
+                <ProgressRow
+                  label="Fiber"
+                  value={progress(totals.avgFiber, goals.fiber)}
+                  unit={`${totals.avgFiber} / ${goals.fiber}g`}
+                  color="#7a9990"
+                />
               </div>
             )}
           </section>
@@ -235,22 +247,9 @@ function WeeklyPage() {
                 Avg {(totals.avgWater / 1000).toFixed(2)} L
               </span>
             </div>
-            <div className="h-40">
-              <ClientOnly fallback={<ChartFallback />}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={days.map((d) => ({ ...d, waterL: +(d.water / 1000).toFixed(2) }))} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
-                    <CartesianGrid stroke="#eeebe3" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }} />
-                    {goals && (
-                      <ReferenceLine y={goals.water_ml / 1000} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
-                    )}
-                    <Bar dataKey="waterL" fill="#ca0013" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ClientOnly>
-            </div>
+            <SafeChart height={160}>
+              <WaterChart days={days} goalMl={goals?.water_ml} />
+            </SafeChart>
             {goals && (
               <ProgressRow
                 label="Goal progress"
@@ -263,10 +262,6 @@ function WeeklyPage() {
       )}
     </div>
   );
-}
-
-function ChartFallback() {
-  return <div className="h-full w-full animate-pulse rounded-2xl bg-cream" />;
 }
 
 function LegendDot({ color, label }: { color: string; label: string }) {
@@ -297,8 +292,14 @@ function ProgressRow({
           {unit} · {value}%
         </span>
       </div>
-      <div className="h-2 w-full rounded-full" style={{ backgroundColor: "rgba(183,198,194,0.3)" }}>
-        <div className="h-2 rounded-full transition-[width]" style={{ width: `${value}%`, backgroundColor: color }} />
+      <div
+        className="h-2 w-full rounded-full"
+        style={{ backgroundColor: "rgba(183,198,194,0.3)" }}
+      >
+        <div
+          className="h-2 rounded-full transition-[width]"
+          style={{ width: `${value}%`, backgroundColor: color }}
+        />
       </div>
     </div>
   );
