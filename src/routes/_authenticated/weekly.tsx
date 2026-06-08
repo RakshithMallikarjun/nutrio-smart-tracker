@@ -166,23 +166,21 @@ function WeeklyPage() {
             </div>
             <div className="h-44">
               <ClientOnly fallback={<ChartFallback />}>
-                {() => (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={days} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
-                      <CartesianGrid stroke="#eeebe3" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
-                      <Tooltip
-                        cursor={{ fill: "rgba(183,198,194,0.15)" }}
-                        contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }}
-                      />
-                      {goals && (
-                        <ReferenceLine y={goals.calories} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
-                      )}
-                      <Bar dataKey="calories" fill="#171e19" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={days} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
+                    <CartesianGrid stroke="#eeebe3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 700, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#b7c6c2" }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      cursor={{ fill: "rgba(183,198,194,0.15)" }}
+                      contentStyle={{ borderRadius: 12, border: "1px solid rgba(183,198,194,0.5)", fontSize: 12 }}
+                    />
+                    {goals && (
+                      <ReferenceLine y={goals.calories} stroke="#ca0013" strokeDasharray="4 4" strokeWidth={1.5} />
+                    )}
+                    <Bar dataKey="calories" fill="#171e19" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </ClientOnly>
             </div>
             {goals && (
