@@ -321,6 +321,15 @@ function Dashboard() {
         onAdd={store.addWater}
         onUndo={store.undoWater}
       />
+
+      <AiPhotoSheet
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        onAdd={(food, meal) => {
+          store.addFood(food, meal);
+          setActiveMeal(meal);
+        }}
+      />
     </div>
   );
 }
