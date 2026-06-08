@@ -106,6 +106,9 @@ export function FoodSearchSheet({ open, onClose, onAdd }: Props) {
             >
               <div className="min-w-0">
                 <p className="truncate text-base font-extrabold text-charcoal">{f.name}</p>
+                <p className="truncate text-[10px] font-bold uppercase tracking-wider" style={{ color: "#ca0013" }}>
+                  {f.category}
+                </p>
                 <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>
                   {f.serving} · {f.calories} kcal · P{f.protein} C{f.carbs} F{f.fat}
                 </p>
