@@ -70,6 +70,7 @@ export function AiPhotoSheet({ open, onClose, onAdd }: Props) {
     const food: Food = {
       id: `ai-${Date.now()}`,
       name: result.name,
+      category: "AI Scan",
       serving: result.serving,
       calories: result.calories,
       protein: result.protein,
