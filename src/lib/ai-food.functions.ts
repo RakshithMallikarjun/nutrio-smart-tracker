@@ -90,3 +90,67 @@ export const recognizeFood = createServerFn({ method: "POST" })
       confidence: (parsed.confidence as RecognizedFood["confidence"]) ?? "medium",
     };
   });
+
+export type ParsedFoodItem = { name: string; quantity: number; unit?: string };
+
+const PARSE_SYSTEM = `You extract food items from a short spoken sentence.
+Return ONLY JSON: {"items":[{"name": string, "quantity": number, "unit"?: string}]}.
+Rules:
+- One item per dish. Combine adjectives ("masala dosa") into name.
+- quantity defaults to 1. "a"/"an"/"one" => 1, "two" => 2, etc.
+- unit is optional: pieces, cups, ml, g, plate, bowl, slice, glass.
+- Lowercase canonical food names ("idli" not "idlies").
+- If nothing parseable, return {"items":[]}.`;
+
+export const parseFoodText = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { text: string }) => {
+    if (!data?.text || typeof data.text !== "string") throw new Error("Invalid text");
+    if (data.text.length > 500) throw new Error("Text too long");
+    return data;
+  })
+  .handler(async ({ data }): Promise<{ items: ParsedFoodItem[] }> => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { role: "system", content: PARSE_SYSTEM },
+          { role: "user", content: data.text },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      if (resp.status === 429) throw new Error("AI is busy — try again shortly.");
+      if (resp.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI error ${resp.status}: ${body.slice(0, 200)}`);
+    }
+
+    const json = await resp.json();
+    const raw = json?.choices?.[0]?.message?.content ?? "{}";
+    let parsed: { items?: ParsedFoodItem[] } = {};
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) parsed = JSON.parse(m[0]);
+    }
+    const items = Array.isArray(parsed.items) ? parsed.items : [];
+    return {
+      items: items
+        .map((i) => ({
+          name: String(i.name ?? "").trim(),
+          quantity: Number.isFinite(Number(i.quantity)) ? Math.max(0.25, Number(i.quantity)) : 1,
+          unit: i.unit ? String(i.unit).toLowerCase() : undefined,
+        }))
+        .filter((i) => i.name.length > 0),
+    };
+  });
+

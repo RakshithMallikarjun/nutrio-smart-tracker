@@ -1,3 +1,5 @@
+import { inferDiet } from "@/lib/quantity";
+
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
 export type Food = {
@@ -11,6 +13,7 @@ export type Food = {
   fat: number;
   fiber: number;
   source?: string;
+  diet?: "vegan" | "veg" | "egg" | "nonveg";
 };
 
 export type MealEntry = Food & { mealType: MealType; loggedAt: string };
@@ -321,9 +324,35 @@ const RAW: Omit<Food, "id">[] = [
   { name: "Quaker Oats", category: "Packaged — Breakfast", serving: "40g (dry)", calories: 150, protein: 5, carbs: 27, fat: 3, fiber: 4, source: "OpenFoodFacts" },
 ];
 
-export const FOOD_DB: Food[] = RAW.map((f, i) => ({ id: `f${i + 1}`, ...f }));
+
+
+export const FOOD_DB: Food[] = RAW.map((f, i) => ({
+  id: `f${i + 1}`,
+  ...f,
+  diet: inferDiet(f.name, f.category),
+}));
 
 export const FOOD_CATEGORIES: string[] = Array.from(new Set(FOOD_DB.map((f) => f.category)));
+
+// Fuzzy lookup for voice / AI / barcode flows.
+export function findFood(name: string): Food | undefined {
+  const q = name.trim().toLowerCase();
+  if (!q) return undefined;
+  let best: { f: Food; score: number } | undefined;
+  for (const f of FOOD_DB) {
+    const n = f.name.toLowerCase();
+    let score = 0;
+    if (n === q) score = 100;
+    else if (n.includes(q) || q.includes(n)) score = 60 + Math.min(n.length, q.length);
+    else {
+      const words = q.split(/\s+/);
+      const hits = words.filter((w) => w.length > 2 && n.includes(w)).length;
+      score = hits * 10;
+    }
+    if (score > 0 && (!best || score > best.score)) best = { f, score };
+  }
+  return best && best.score >= 20 ? best.f : undefined;
+}
 
 export const DEFAULT_GOALS = {
   calories: 2200,
