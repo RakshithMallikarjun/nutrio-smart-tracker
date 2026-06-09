@@ -152,3 +152,5 @@ export const parseFoodText = createServerFn({ method: "POST" })
         }))
         .filter((i) => i.name.length > 0),
     };
+  });
+
