@@ -1,3 +1,5 @@
+import { inferDiet } from "@/lib/quantity";
+
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
 export type Food = {
