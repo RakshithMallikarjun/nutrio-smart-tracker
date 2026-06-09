@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Bell, Flame, Droplet, Trash2, Sparkles, ChevronRight, Settings, LogOut, TrendingUp, Camera } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bell, Flame, Droplet, Trash2, Sparkles, ChevronRight, Settings, LogOut, TrendingUp, Camera, Mic, ScanBarcode } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
@@ -10,6 +10,8 @@ import { BottomNav, type Tab } from "@/components/nutrio/BottomNav";
 import { FoodSearchSheet } from "@/components/nutrio/FoodSearchSheet";
 import { WaterSheet } from "@/components/nutrio/WaterSheet";
 import { AiPhotoSheet } from "@/components/nutrio/AiPhotoSheet";
+import { VoiceLogSheet } from "@/components/nutrio/VoiceLogSheet";
+import { BarcodeSheet } from "@/components/nutrio/BarcodeSheet";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -23,21 +25,42 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 const MEALS: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
+const MEAL_STORE_KEY = "nutrio:selected-meal";
+
+function autoMeal(): MealType {
+  const h = new Date().getHours();
+  if (h < 11) return "breakfast";
+  if (h < 16) return "lunch";
+  if (h < 21) return "dinner";
+  return "snack";
+}
 
 function Dashboard() {
   const navigate = useNavigate();
   const { user } = Route.useRouteContext();
   const store = useNutrioCloud(user?.id);
   const [activeTab, setActiveTab] = useState<Tab>("home");
-  const [activeMeal, setActiveMeal] = useState<MealType>("breakfast");
+  const [activeMeal, setActiveMeal] = useState<MealType>(autoMeal());
   const [foodOpen, setFoodOpen] = useState(false);
   const [waterOpen, setWaterOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [barcodeOpen, setBarcodeOpen] = useState(false);
+
+  // Restore last-selected meal across sessions.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(MEAL_STORE_KEY) as MealType | null;
+    if (saved && MEALS.includes(saved)) setActiveMeal(saved);
+  }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined") window.localStorage.setItem(MEAL_STORE_KEY, activeMeal);
+  }, [activeMeal]);
 
   const remaining = Math.max(0, store.goals.calories - store.totals.calories);
   const mealMap = useMemo(() => {
     const map = new Map<MealType, typeof store.meals>();
-    (["breakfast", "lunch", "dinner", "snack"] as MealType[]).forEach((m) => map.set(m, []));
+    MEALS.forEach((m) => map.set(m, []));
     store.meals.forEach((entry) => map.get(entry.meal_type)?.push(entry));
     return map;
   }, [store.meals]);
@@ -58,105 +81,39 @@ function Dashboard() {
             Hello, {store.displayName}
           </h1>
         </div>
-        <div className="ml-3 flex shrink-0 items-center gap-2">
-          <Link
-            to="/weekly"
-            aria-label="Weekly summary"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border"
-          >
+        <div className="ml-3 flex shrink-0 items-center gap-1.5">
+          <Link to="/weekly" aria-label="Weekly summary" className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border">
             <TrendingUp size={18} />
           </Link>
-          <Link
-            to="/goals"
-            aria-label="Goals"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border"
-          >
+          <Link to="/goals" aria-label="Goals" className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border">
             <Settings size={18} />
           </Link>
-          <button
-            onClick={signOut}
-            aria-label="Sign out"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border"
-          >
+          <button onClick={signOut} aria-label="Sign out" className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border">
             <LogOut size={18} />
           </button>
           <div className="relative">
-            <div
-              className="flex h-11 w-11 items-center justify-center rounded-full text-base font-black text-white"
-              style={{ backgroundColor: "#171e19", border: "2px solid #ffffff" }}
-            >
+            <div className="flex h-11 w-11 items-center justify-center rounded-full text-base font-black text-white" style={{ backgroundColor: "#171e19", border: "2px solid #ffffff" }}>
               {store.displayName.charAt(0).toUpperCase()}
             </div>
-            <div
-              className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full"
-              style={{ backgroundColor: "#ca0013", border: "2px solid #eeebe3" }}
-            >
+            <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full" style={{ backgroundColor: "#ca0013", border: "2px solid #eeebe3" }}>
               <Bell size={8} color="#fff" strokeWidth={3} />
             </div>
           </div>
         </div>
       </header>
 
-      {/* Horizontal meal selector */}
-      <div className="mt-5 flex gap-2.5 overflow-x-auto px-5 pb-2" style={{ scrollSnapType: "x mandatory" }}>
-        {MEALS.map((m) => {
-          const active = m === activeMeal;
-          const kcal = (mealMap.get(m) ?? []).reduce((a, b) => a + Number(b.calories), 0);
-          if (active) {
-            return (
-              <button
-                key={m}
-                onClick={() => setActiveMeal(m)}
-                className="flex h-14 shrink-0 items-center gap-2.5 rounded-2xl pl-2 pr-4"
-                style={{ backgroundColor: "#171e19", scrollSnapAlign: "start" }}
-              >
-                <div
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-base"
-                  style={{ backgroundColor: "#ca0013" }}
-                >
-                  {MEAL_EMOJI[m]}
-                </div>
-                <div className="flex flex-col items-start leading-tight">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-white/60">
-                    {MEAL_LABELS[m]}
-                  </span>
-                  <span className="text-sm font-extrabold text-white">{kcal} kcal</span>
-                </div>
-              </button>
-            );
-          }
-          return (
-            <button
-              key={m}
-              onClick={() => setActiveMeal(m)}
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-xl transition-transform hover:scale-105 sage-border-soft"
-              style={{ scrollSnapAlign: "start" }}
-              aria-label={MEAL_LABELS[m]}
-            >
-              {MEAL_EMOJI[m]}
-            </button>
-          );
-        })}
-      </div>
-
       {/* Hero card */}
-      <section className="relative mx-5 mt-3 overflow-hidden rounded-[2rem] bg-white p-5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
-        <div
-          className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full"
-          style={{ backgroundColor: "rgba(183,198,194,0.22)" }}
-        />
+      <section className="relative mx-5 mt-5 overflow-hidden rounded-[2rem] bg-white p-5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full" style={{ backgroundColor: "rgba(183,198,194,0.22)" }} />
         <div className="relative flex items-center gap-3">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-cream text-2xl">🔥</div>
           <div className="min-w-0">
             <p className="text-label" style={{ color: "#b7c6c2" }}>Today's intake</p>
             <p className="text-2xl font-black leading-tight text-charcoal">{Math.round(store.totals.calories)} kcal</p>
-            <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>
-              of {store.goals.calories} kcal goal
-            </p>
+            <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>of {store.goals.calories} kcal goal</p>
           </div>
         </div>
 
-        {/* Ring + macros — stacked vertically to avoid overlap on narrow screens */}
         <div className="mt-5 flex flex-col items-center gap-5">
           <Ring value={store.totals.calories} max={store.goals.calories} size={150} stroke={12}>
             <Flame size={18} color="#ca0013" />
@@ -172,11 +129,7 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Alert / info box */}
-        <div
-          className="mt-4 flex items-center gap-2.5 rounded-2xl p-3"
-          style={{ backgroundColor: "rgba(183,198,194,0.2)" }}
-        >
+        <div className="mt-4 flex items-center gap-2.5 rounded-2xl p-3" style={{ backgroundColor: "rgba(183,198,194,0.2)" }}>
           <Sparkles size={16} color="#171e19" className="shrink-0" />
           <p className="text-xs font-bold leading-snug text-charcoal">
             {store.goals.calories > 0
@@ -186,41 +139,34 @@ function Dashboard() {
         </div>
       </section>
 
+      {/* Quick actions */}
+      <div className="mx-5 mt-3 grid grid-cols-3 gap-2">
+        <QuickAction icon={<Mic size={16} />} label="Voice" onClick={() => setVoiceOpen(true)} />
+        <QuickAction icon={<Camera size={16} />} label="Scan dish" onClick={() => setAiOpen(true)} />
+        <QuickAction icon={<ScanBarcode size={16} />} label="Barcode" onClick={() => setBarcodeOpen(true)} />
+      </div>
+
       {/* Water widget */}
-      <button
-        onClick={() => setWaterOpen(true)}
-        className="mx-5 mt-3 flex w-[calc(100%-2.5rem)] items-center justify-between rounded-[1.5rem] bg-white p-3.5 text-left sage-border-soft"
-      >
+      <button onClick={() => setWaterOpen(true)} className="mx-5 mt-3 flex w-[calc(100%-2.5rem)] items-center justify-between rounded-[1.5rem] bg-white p-3.5 text-left sage-border-soft">
         <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: "rgba(202,0,19,0.1)" }}
-          >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: "rgba(202,0,19,0.1)" }}>
             <Droplet size={20} color="#ca0013" />
           </div>
           <div className="min-w-0">
             <p className="text-label" style={{ color: "#b7c6c2" }}>Water</p>
             <p className="text-base font-black leading-tight text-charcoal">
               {(store.waterTotal / 1000).toFixed(2)}
-              <span className="ml-1 text-xs font-bold" style={{ color: "#b7c6c2" }}>
-                / {(store.goals.water_ml / 1000).toFixed(1)} L
-              </span>
+              <span className="ml-1 text-xs font-bold" style={{ color: "#b7c6c2" }}>/ {(store.goals.water_ml / 1000).toFixed(1)} L</span>
             </p>
             <div className="mt-1 h-1.5 w-32 rounded-full" style={{ backgroundColor: "rgba(183,198,194,0.3)" }}>
-              <div
-                className="h-1.5 rounded-full transition-[width]"
-                style={{
-                  width: `${Math.min(100, (store.waterTotal / store.goals.water_ml) * 100)}%`,
-                  backgroundColor: "#ca0013",
-                }}
-              />
+              <div className="h-1.5 rounded-full transition-[width]" style={{ width: `${Math.min(100, (store.waterTotal / store.goals.water_ml) * 100)}%`, backgroundColor: "#ca0013" }} />
             </div>
           </div>
         </div>
         <ChevronRight color="#b7c6c2" className="shrink-0" />
       </button>
 
-      {/* Day overview — all meal sections at a glance */}
+      {/* Today's overview */}
       <section className="mx-5 mt-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-black text-charcoal">Today's Overview</h2>
@@ -230,7 +176,7 @@ function Dashboard() {
         </div>
         <div className="grid grid-cols-2 gap-2">
           {MEALS.map((m) => {
-            const items = store.meals.filter((x) => x.meal_type === m);
+            const items = mealMap.get(m) ?? [];
             const kcal = items.reduce((a, b) => a + Number(b.calories), 0);
             const active = m === activeMeal;
             return (
@@ -243,29 +189,15 @@ function Dashboard() {
                   border: active ? "none" : "1px solid rgba(183,198,194,0.5)",
                 }}
               >
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
-                  style={{ backgroundColor: active ? "#ca0013" : "rgba(202,0,19,0.1)" }}
-                >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base" style={{ backgroundColor: active ? "#ca0013" : "rgba(202,0,19,0.1)" }}>
                   {MEAL_EMOJI[m]}
                 </div>
                 <div className="min-w-0 flex-1 leading-tight">
-                  <p
-                    className="text-[10px] font-bold uppercase tracking-wider"
-                    style={{ color: active ? "rgba(255,255,255,0.6)" : "#b7c6c2" }}
-                  >
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: active ? "rgba(255,255,255,0.6)" : "#b7c6c2" }}>
                     {MEAL_LABELS[m]}
                   </p>
-                  <p
-                    className="text-sm font-extrabold"
-                    style={{ color: active ? "#ffffff" : "#171e19" }}
-                  >
-                    {Math.round(kcal)} kcal
-                  </p>
-                  <p
-                    className="text-[10px] font-bold"
-                    style={{ color: active ? "rgba(255,255,255,0.6)" : "#b7c6c2" }}
-                  >
+                  <p className="text-sm font-extrabold" style={{ color: active ? "#ffffff" : "#171e19" }}>{Math.round(kcal)} kcal</p>
+                  <p className="text-[10px] font-bold" style={{ color: active ? "rgba(255,255,255,0.6)" : "#b7c6c2" }}>
                     {items.length} {items.length === 1 ? "item" : "items"}
                   </p>
                 </div>
@@ -276,29 +208,13 @@ function Dashboard() {
       </section>
 
       {/* Active meal feed */}
-
       <section className="mx-5 mt-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-black text-charcoal">
             {MEAL_LABELS[activeMeal]}
             <span className="ml-1.5 text-sm" style={{ color: "#b7c6c2" }}>· {mealsForActive.length}</span>
           </h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setAiOpen(true)}
-              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white"
-              style={{ backgroundColor: "#ca0013" }}
-            >
-              <Camera size={13} /> Scan
-            </button>
-            <button
-              onClick={() => setFoodOpen(true)}
-              className="text-label"
-              style={{ color: "#ca0013" }}
-            >
-              + Add
-            </button>
-          </div>
+          <button onClick={() => setFoodOpen(true)} className="text-label" style={{ color: "#ca0013" }}>+ Add</button>
         </div>
 
         {mealsForActive.length === 0 ? (
@@ -310,14 +226,8 @@ function Dashboard() {
         ) : (
           <ul className="space-y-2">
             {mealsForActive.map((m) => (
-              <li
-                key={m.id}
-                className="animate-fade-in flex items-center gap-3 rounded-2xl bg-white p-3 sage-border"
-              >
-                <div
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl"
-                  style={{ backgroundColor: "rgba(202,0,19,0.1)" }}
-                >
+              <li key={m.id} className="animate-fade-in flex items-center gap-3 rounded-2xl bg-white p-3 sage-border">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl" style={{ backgroundColor: "rgba(202,0,19,0.1)" }}>
                   {MEAL_EMOJI[m.meal_type]}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -326,12 +236,7 @@ function Dashboard() {
                     {m.serving} · {Math.round(m.calories)} kcal · P{Math.round(m.protein)} C{Math.round(m.carbs)} F{Math.round(m.fat)}
                   </p>
                 </div>
-                <button
-                  onClick={() => store.removeMeal(m.id)}
-                  className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-vibrant"
-                  style={{ border: "1px solid rgba(183,198,194,0.5)" }}
-                  aria-label="Remove"
-                >
+                <button onClick={() => store.removeMeal(m.id)} className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-vibrant" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Remove">
                   <Trash2 size={15} className="group-hover:text-white" />
                 </button>
               </li>
@@ -354,6 +259,7 @@ function Dashboard() {
       <FoodSearchSheet
         open={foodOpen}
         onClose={() => setFoodOpen(false)}
+        defaultMeal={activeMeal}
         onAdd={(food, meal) => {
           store.addFood(food, meal);
           setActiveMeal(meal);
@@ -378,6 +284,38 @@ function Dashboard() {
           setActiveMeal(meal);
         }}
       />
+
+      <VoiceLogSheet
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        defaultMeal={activeMeal}
+        onAdd={(food, meal) => {
+          store.addFood(food, meal);
+          setActiveMeal(meal);
+        }}
+      />
+
+      <BarcodeSheet
+        open={barcodeOpen}
+        onClose={() => setBarcodeOpen(false)}
+        defaultMeal={activeMeal}
+        onAdd={(food, meal) => {
+          store.addFood(food, meal);
+          setActiveMeal(meal);
+        }}
+      />
     </div>
+  );
+}
+
+function QuickAction({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center justify-center gap-1.5 rounded-2xl bg-white py-2.5 text-xs font-extrabold text-charcoal transition-colors hover:bg-cream sage-border-soft"
+    >
+      <span style={{ color: "#ca0013" }}>{icon}</span>
+      {label}
+    </button>
   );
 }
