@@ -324,7 +324,7 @@ const RAW: Omit<Food, "id">[] = [
   { name: "Quaker Oats", category: "Packaged — Breakfast", serving: "40g (dry)", calories: 150, protein: 5, carbs: 27, fat: 3, fiber: 4, source: "OpenFoodFacts" },
 ];
 
-import { inferDiet } from "@/lib/quantity";
+
 
 export const FOOD_DB: Food[] = RAW.map((f, i) => ({
   id: `f${i + 1}`,
