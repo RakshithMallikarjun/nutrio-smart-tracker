@@ -64,6 +64,7 @@ function GoalsPage() {
   const [diet, setDiet] = useDietPref();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showMacros, setShowMacros] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
