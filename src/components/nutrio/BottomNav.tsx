@@ -1,6 +1,6 @@
-import { Home, Search, Plus, Droplet, User } from "lucide-react";
+import { Home, TrendingUp, Plus, Droplet, User } from "lucide-react";
 
-type Tab = "home" | "search" | "water" | "profile";
+type Tab = "home" | "trends" | "water" | "profile";
 
 type Props = {
   active: Tab;
@@ -31,7 +31,7 @@ export function BottomNav({ active, onChange, onAdd }: Props) {
       >
         <div className="flex flex-1 justify-around">
           {item("home", Home, "Home")}
-          {item("search", Search, "Search")}
+          {item("trends", TrendingUp, "Trends")}
         </div>
 
         {/* Floating FAB */}
