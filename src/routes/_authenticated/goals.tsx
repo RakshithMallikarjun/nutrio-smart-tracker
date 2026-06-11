@@ -191,21 +191,34 @@ function GoalsPage() {
         </div>
       </section>
 
-      {/* Sliders */}
-      <div className="mx-5 mt-4 space-y-3">
-        {FIELDS.map((f) => (
-          <div key={f.key} className="rounded-2xl bg-white p-4 sage-border">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-label" style={{ color: "#b7c6c2" }}>{f.label}</span>
-              <div className="flex items-baseline gap-1">
-                <input type="number" inputMode="numeric" min={f.min} max={f.max} step={f.step} value={goals[f.key]} onChange={(e) => setGoals({ ...goals, [f.key]: Number(e.target.value) || 0 })} className="w-20 rounded-lg bg-cream px-2 py-1 text-right text-base font-black text-charcoal outline-none sage-border-soft" />
-                <span className="text-xs font-bold" style={{ color: "#b7c6c2" }}>{f.unit}</span>
-              </div>
-            </div>
-            <input type="range" min={f.min} max={f.max} step={f.step} value={goals[f.key]} onChange={(e) => setGoals({ ...goals, [f.key]: Number(e.target.value) })} className="w-full accent-[#ca0013]" />
-          </div>
-        ))}
+      {/* Manual macros toggle */}
+      <div className="mx-5 mt-4">
+        <button
+          onClick={() => setShowMacros((s) => !s)}
+          className="flex w-full items-center justify-between rounded-2xl bg-white p-4 text-left sage-border"
+        >
+          <span className="text-sm font-extrabold text-charcoal">Set macros manually</span>
+          {showMacros ? <ChevronUp size={18} color="#171e19" /> : <ChevronDown size={18} color="#171e19" />}
+        </button>
       </div>
+
+      {/* Sliders */}
+      {showMacros && (
+        <div className="mx-5 mt-3 space-y-3">
+          {FIELDS.map((f) => (
+            <div key={f.key} className="rounded-2xl bg-white p-4 sage-border">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-label" style={{ color: "#b7c6c2" }}>{f.label}</span>
+                <div className="flex items-baseline gap-1">
+                  <input type="number" inputMode="numeric" min={f.min} max={f.max} step={f.step} value={goals[f.key]} onChange={(e) => setGoals({ ...goals, [f.key]: Number(e.target.value) || 0 })} className="w-20 rounded-lg bg-cream px-2 py-1 text-right text-base font-black text-charcoal outline-none sage-border-soft" />
+                  <span className="text-xs font-bold" style={{ color: "#b7c6c2" }}>{f.unit}</span>
+                </div>
+              </div>
+              <input type="range" min={f.min} max={f.max} step={f.step} value={goals[f.key]} onChange={(e) => setGoals({ ...goals, [f.key]: Number(e.target.value) })} className="w-full accent-[#ca0013]" />
+            </div>
+          ))}
+        </div>
+      )}
 
       <button onClick={save} disabled={saving || loading} className="mx-5 mt-6 flex w-[calc(100%-2.5rem)] items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-extrabold text-white disabled:opacity-60" style={{ backgroundColor: "#ca0013" }}>
         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
