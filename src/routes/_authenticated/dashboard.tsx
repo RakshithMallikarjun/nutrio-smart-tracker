@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Flame, Droplet, Trash2, Sparkles, ChevronRight, Settings, LogOut, TrendingUp, Camera, Mic, ScanBarcode } from "lucide-react";
+import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
@@ -12,6 +12,16 @@ import { WaterSheet } from "@/components/nutrio/WaterSheet";
 import { AiPhotoSheet } from "@/components/nutrio/AiPhotoSheet";
 import { VoiceLogSheet } from "@/components/nutrio/VoiceLogSheet";
 import { BarcodeSheet } from "@/components/nutrio/BarcodeSheet";
+import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
+import { Walkthrough } from "@/components/nutrio/Walkthrough";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -46,6 +56,13 @@ function Dashboard() {
   const [aiOpen, setAiOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [barcodeOpen, setBarcodeOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [bootLoading, setBootLoading] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBootLoading(false), 700);
+    return () => clearTimeout(t);
+  }, []);
 
   // Restore last-selected meal across sessions.
   useEffect(() => {
@@ -66,13 +83,23 @@ function Dashboard() {
   }, [store.meals]);
   const mealsForActive = mealMap.get(activeMeal) ?? [];
 
-  const signOut = async () => {
+  const confirmSignOut = async () => {
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   };
 
+  if (bootLoading) {
+    return (
+      <div className="mx-auto flex min-h-screen w-full max-w-md items-center justify-center" style={{ backgroundColor: "#eeebe3" }}>
+        <NutrioLoader />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto min-h-screen w-full max-w-md pb-32" style={{ backgroundColor: "#eeebe3" }}>
+      <Walkthrough />
+
       {/* Header */}
       <header className="flex items-center justify-between px-5 pt-12">
         <div className="min-w-0 flex-1">
@@ -82,22 +109,11 @@ function Dashboard() {
           </h1>
         </div>
         <div className="ml-3 flex shrink-0 items-center gap-1.5">
-          <Link to="/weekly" aria-label="Weekly summary" className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border">
-            <TrendingUp size={18} />
-          </Link>
-          <Link to="/goals" aria-label="Goals" className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border">
-            <Settings size={18} />
-          </Link>
-          <button onClick={signOut} aria-label="Sign out" className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border">
+          <button onClick={() => setSignOutOpen(true)} aria-label="Sign out" className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border">
             <LogOut size={18} />
           </button>
-          <div className="relative">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full text-base font-black text-white" style={{ backgroundColor: "#171e19", border: "2px solid #ffffff" }}>
-              {store.displayName.charAt(0).toUpperCase()}
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full" style={{ backgroundColor: "#ca0013", border: "2px solid #eeebe3" }}>
-              <Bell size={8} color="#fff" strokeWidth={3} />
-            </div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-full text-base font-black text-white" style={{ backgroundColor: "#171e19", border: "2px solid #ffffff" }}>
+            {store.displayName.charAt(0).toUpperCase()}
           </div>
         </div>
       </header>
@@ -249,7 +265,7 @@ function Dashboard() {
         active={activeTab}
         onChange={(t) => {
           setActiveTab(t);
-          if (t === "search") setFoodOpen(true);
+          if (t === "trends") navigate({ to: "/weekly" });
           if (t === "water") setWaterOpen(true);
           if (t === "profile") navigate({ to: "/goals" });
         }}
@@ -260,6 +276,10 @@ function Dashboard() {
         open={foodOpen}
         onClose={() => setFoodOpen(false)}
         defaultMeal={activeMeal}
+        onVoice={() => {
+          setFoodOpen(false);
+          setVoiceOpen(true);
+        }}
         onAdd={(food, meal) => {
           store.addFood(food, meal);
           setActiveMeal(meal);
@@ -304,6 +324,32 @@ function Dashboard() {
           setActiveMeal(meal);
         }}
       />
+
+      <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Sign out?</DialogTitle>
+            <DialogDescription>
+              You'll need to sign back in to access your logs.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              onClick={() => setSignOutOpen(false)}
+              className="flex-1 rounded-full bg-cream py-2.5 text-sm font-extrabold text-charcoal sage-border-soft"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmSignOut}
+              className="flex-1 rounded-full py-2.5 text-sm font-extrabold text-white"
+              style={{ backgroundColor: "#ca0013" }}
+            >
+              Sign Out
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
