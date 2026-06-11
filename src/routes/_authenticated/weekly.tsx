@@ -166,18 +166,36 @@ function WeeklyPage() {
         </Link>
         <div className="min-w-0">
           <p className="text-label" style={{ color: "#b7c6c2" }}>
-            Last 7 days
+            {TF_LABEL[timeframe]}
           </p>
           <h1 className="truncate text-[22px] font-black leading-tight text-charcoal">
-            Weekly Summary
+            Trends
           </h1>
         </div>
       </header>
 
+      {/* Timeframe segmented */}
+      <div className="mx-5 mt-4 grid grid-cols-3 gap-1 rounded-full bg-white p-1 sage-border-soft">
+        {(["daily", "weekly", "monthly"] as Timeframe[]).map((t) => {
+          const active = t === timeframe;
+          return (
+            <button
+              key={t}
+              onClick={() => setTimeframe(t)}
+              className="rounded-full py-2 text-xs font-extrabold capitalize transition-colors"
+              style={{
+                backgroundColor: active ? "#171e19" : "transparent",
+                color: active ? "#ffffff" : "#171e19",
+              }}
+            >
+              {t}
+            </button>
+          );
+        })}
+      </div>
+
       {loading ? (
-        <p className="mt-10 text-center text-sm font-bold" style={{ color: "#b7c6c2" }}>
-          Loading your trends…
-        </p>
+        <NutrioLoader />
       ) : (
         <>
           {/* Calorie trend */}
