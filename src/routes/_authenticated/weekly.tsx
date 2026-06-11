@@ -72,10 +72,12 @@ function WeeklyPage() {
   const [goals, setGoals] = useState<Goals | null>(null);
   const [days, setDays] = useState<DayRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
 
   useEffect(() => {
     if (!user?.id) return;
-    const range = lastNDays(7);
+    setLoading(true);
+    const range = lastNDays(TF_DAYS[timeframe]);
     const start = range[0].date;
     (async () => {
       const [g, m, w] = await Promise.all([
@@ -121,7 +123,7 @@ function WeeklyPage() {
       setDays(Object.values(map));
       setLoading(false);
     })();
-  }, [user?.id]);
+  }, [user?.id, timeframe]);
 
   const totals = useMemo(() => {
     const sum = days.reduce(
