@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { X, Search, Plus, Minus } from "lucide-react";
+import { X, Search, Plus, Minus, Mic } from "lucide-react";
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { useDietPref } from "@/hooks/use-diet-pref";
 import { isAllowed, parseQty, scaleFood, type DietPref } from "@/lib/quantity";
@@ -9,6 +9,7 @@ type Props = {
   onClose: () => void;
   defaultMeal: MealType;
   onAdd: (food: Food, meal: MealType) => void;
+  onVoice?: () => void;
 };
 
 const DIET_LABELS: Record<DietPref, string> = {
@@ -19,7 +20,7 @@ const DIET_LABELS: Record<DietPref, string> = {
   vegan: "Vegan",
 };
 
-export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd }: Props) {
+export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice }: Props) {
   const [q, setQ] = useState("");
   const [meal, setMeal] = useState<MealType>(defaultMeal);
   const [cat, setCat] = useState<string>("All");
@@ -37,7 +38,6 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd }: Props) {
     });
   }, [open, defaultMeal]);
 
-  // Smart quantity: extract leading qty from the query, search by the rest.
   const { qtyFromQuery, term } = useMemo(() => {
     const trimmed = q.trim();
     if (!trimmed) return { qtyFromQuery: 1, term: "" };
@@ -58,6 +58,8 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd }: Props) {
 
   if (!open) return null;
 
+  const meals = Object.keys(MEAL_LABELS) as MealType[];
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(23,30,25,0.4)" }} onClick={onClose}>
       <div className="animate-fade-in flex h-[88vh] w-full max-w-md flex-col rounded-t-[2.5rem] bg-white p-6 pb-32" onClick={(e) => e.stopPropagation()}>
@@ -68,23 +70,32 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd }: Props) {
           </button>
         </div>
 
-        {/* Meal selector */}
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-          {(Object.keys(MEAL_LABELS) as MealType[]).map((m) => {
+        {/* Compact meal selector — active expands, others 40px emoji-only */}
+        <div className="mb-3 flex gap-2">
+          {meals.map((m) => {
             const active = m === meal;
+            if (active) {
+              return (
+                <button
+                  key={m}
+                  onClick={() => setMeal(m)}
+                  className="flex h-10 flex-1 items-center justify-center gap-2 rounded-full px-3 text-sm font-extrabold"
+                  style={{ backgroundColor: "#171e19", color: "#ffffff" }}
+                >
+                  <span>{MEAL_EMOJI[m]}</span>
+                  <span className="truncate">{MEAL_LABELS[m]}</span>
+                </button>
+              );
+            }
             return (
               <button
                 key={m}
                 onClick={() => setMeal(m)}
-                className="flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-extrabold transition-colors"
-                style={{
-                  backgroundColor: active ? "#171e19" : "#ffffff",
-                  color: active ? "#ffffff" : "#171e19",
-                  border: active ? "none" : "1px solid rgba(183,198,194,0.5)",
-                }}
+                aria-label={MEAL_LABELS[m]}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
+                style={{ backgroundColor: "#ffffff", border: "1px solid rgba(183,198,194,0.5)" }}
               >
-                <span>{MEAL_EMOJI[m]}</span>
-                {MEAL_LABELS[m]}
+                {MEAL_EMOJI[m]}
               </button>
             );
           })}
@@ -111,16 +122,37 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd }: Props) {
           })}
         </div>
 
-        {/* Search input */}
+        {/* Search input with clear + mic */}
         <div className="relative mb-3">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2" color="#b7c6c2" />
           <input
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder='Try "2 idlis" or "masala dosa"'
-            className="w-full rounded-2xl bg-cream py-3 pl-11 pr-4 text-base font-semibold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
+            placeholder='Try "2 idlis" or "pizza"'
+            className="w-full rounded-2xl bg-cream py-3 pl-11 pr-20 text-base font-semibold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
           />
+          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+            {q && (
+              <button
+                onClick={() => setQ("")}
+                aria-label="Clear search"
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white"
+              >
+                <X size={14} color="#b7c6c2" />
+              </button>
+            )}
+            {onVoice && (
+              <button
+                onClick={onVoice}
+                aria-label="Voice search"
+                className="flex h-8 w-8 items-center justify-center rounded-full"
+                style={{ backgroundColor: "#ca0013" }}
+              >
+                <Mic size={14} color="#ffffff" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Category chips */}

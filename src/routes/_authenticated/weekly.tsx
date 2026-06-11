@@ -3,6 +3,7 @@ import { lazy, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Flame, Droplet, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SafeChart } from "@/components/nutrio/SafeChart";
+import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
 
 // Lazy-load recharts-backed chart components so they only download/execute on the client.
 const CaloriesChart = lazy(() =>
@@ -50,13 +51,18 @@ type DayRow = {
 
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+type Timeframe = "daily" | "weekly" | "monthly";
+const TF_DAYS: Record<Timeframe, number> = { daily: 1, weekly: 7, monthly: 30 };
+const TF_LABEL: Record<Timeframe, string> = { daily: "Today", weekly: "Last 7 days", monthly: "Last 30 days" };
+
 function lastNDays(n: number): { date: string; label: string }[] {
   const arr: { date: string; label: string }[] = [];
   const today = new Date();
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    arr.push({ date: d.toISOString().slice(0, 10), label: WEEKDAY[d.getDay()] });
+    const label = n <= 7 ? WEEKDAY[d.getDay()] : `${d.getDate()}/${d.getMonth() + 1}`;
+    arr.push({ date: d.toISOString().slice(0, 10), label });
   }
   return arr;
 }
@@ -66,10 +72,12 @@ function WeeklyPage() {
   const [goals, setGoals] = useState<Goals | null>(null);
   const [days, setDays] = useState<DayRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
 
   useEffect(() => {
     if (!user?.id) return;
-    const range = lastNDays(7);
+    setLoading(true);
+    const range = lastNDays(TF_DAYS[timeframe]);
     const start = range[0].date;
     (async () => {
       const [g, m, w] = await Promise.all([
@@ -115,7 +123,7 @@ function WeeklyPage() {
       setDays(Object.values(map));
       setLoading(false);
     })();
-  }, [user?.id]);
+  }, [user?.id, timeframe]);
 
   const totals = useMemo(() => {
     const sum = days.reduce(
@@ -158,18 +166,36 @@ function WeeklyPage() {
         </Link>
         <div className="min-w-0">
           <p className="text-label" style={{ color: "#b7c6c2" }}>
-            Last 7 days
+            {TF_LABEL[timeframe]}
           </p>
           <h1 className="truncate text-[22px] font-black leading-tight text-charcoal">
-            Weekly Summary
+            Trends
           </h1>
         </div>
       </header>
 
+      {/* Timeframe segmented */}
+      <div className="mx-5 mt-4 grid grid-cols-3 gap-1 rounded-full bg-white p-1 sage-border-soft">
+        {(["daily", "weekly", "monthly"] as Timeframe[]).map((t) => {
+          const active = t === timeframe;
+          return (
+            <button
+              key={t}
+              onClick={() => setTimeframe(t)}
+              className="rounded-full py-2 text-xs font-extrabold capitalize transition-colors"
+              style={{
+                backgroundColor: active ? "#171e19" : "transparent",
+                color: active ? "#ffffff" : "#171e19",
+              }}
+            >
+              {t}
+            </button>
+          );
+        })}
+      </div>
+
       {loading ? (
-        <p className="mt-10 text-center text-sm font-bold" style={{ color: "#b7c6c2" }}>
-          Loading your trends…
-        </p>
+        <NutrioLoader />
       ) : (
         <>
           {/* Calorie trend */}
