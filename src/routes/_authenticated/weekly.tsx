@@ -51,13 +51,18 @@ type DayRow = {
 
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+type Timeframe = "daily" | "weekly" | "monthly";
+const TF_DAYS: Record<Timeframe, number> = { daily: 1, weekly: 7, monthly: 30 };
+const TF_LABEL: Record<Timeframe, string> = { daily: "Today", weekly: "Last 7 days", monthly: "Last 30 days" };
+
 function lastNDays(n: number): { date: string; label: string }[] {
   const arr: { date: string; label: string }[] = [];
   const today = new Date();
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    arr.push({ date: d.toISOString().slice(0, 10), label: WEEKDAY[d.getDay()] });
+    const label = n <= 7 ? WEEKDAY[d.getDay()] : `${d.getDate()}/${d.getMonth() + 1}`;
+    arr.push({ date: d.toISOString().slice(0, 10), label });
   }
   return arr;
 }
