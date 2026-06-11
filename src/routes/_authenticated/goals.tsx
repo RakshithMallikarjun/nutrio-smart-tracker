@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Save, Loader2, Calculator } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Calculator, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDietPref } from "@/hooks/use-diet-pref";
 import type { DietPref } from "@/lib/quantity";
