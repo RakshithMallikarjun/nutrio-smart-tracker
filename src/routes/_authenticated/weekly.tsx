@@ -3,6 +3,7 @@ import { lazy, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Flame, Droplet, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SafeChart } from "@/components/nutrio/SafeChart";
+import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
 
 // Lazy-load recharts-backed chart components so they only download/execute on the client.
 const CaloriesChart = lazy(() =>
