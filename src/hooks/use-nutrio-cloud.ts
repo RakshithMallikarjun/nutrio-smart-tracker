@@ -182,6 +182,8 @@ export function useNutrioCloud(userId: string | undefined) {
     displayName,
     addFood: (food: Food, mealType: MealType) => addFoodMutation.mutate({ food, mealType }),
     removeMeal: (id: string) => removeMealMutation.mutate(id),
+    updateMeal: (id: string, patch: Partial<Pick<MealRow, "serving" | "calories" | "protein" | "carbs" | "fat" | "fiber">>) =>
+      updateMealMutation.mutate({ id, patch }),
     addWater: (ml: number) => addWaterMutation.mutate(ml),
     undoWater: () => lastWater && undoWaterMutation.mutate(lastWater.id),
     loaded: true,
