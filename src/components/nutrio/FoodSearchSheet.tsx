@@ -22,7 +22,7 @@ const DIET_LABELS: Record<DietPref, string> = {
   vegan: "Vegan",
 };
 
-export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice }: Props) {
+export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, userId }: Props) {
   const [q, setQ] = useState("");
   const [meal, setMeal] = useState<MealType>(defaultMeal);
   const [cat, setCat] = useState<string>("All");
@@ -30,6 +30,7 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice }: 
   const [foodCategories, setFoodCategories] = useState<string[]>([]);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [diet, setDiet] = useDietPref();
+  const { customFoods } = useCustomFoods(userId);
 
   useEffect(() => {
     if (!open) return;
@@ -40,6 +41,15 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice }: 
     });
   }, [open, defaultMeal]);
 
+  // Merged index: custom foods first so they win on duplicate names.
+  const merged = useMemo<Food[]>(() => [...customFoods, ...foodDb], [customFoods, foodDb]);
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    if (customFoods.length) set.add("My Foods");
+    foodCategories.forEach((c) => set.add(c));
+    return Array.from(set);
+  }, [customFoods, foodCategories]);
+
   const { qtyFromQuery, term } = useMemo(() => {
     const trimmed = q.trim();
     if (!trimmed) return { qtyFromQuery: 1, term: "" };
@@ -48,13 +58,13 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice }: 
   }, [q]);
 
   const results = useMemo(() => {
-    return foodDb.filter((f) => {
+    return merged.filter((f) => {
       if (cat !== "All" && f.category !== cat) return false;
       if (!isAllowed((f.diet ?? "veg") as any, diet)) return false;
       if (term && !f.name.toLowerCase().includes(term) && !f.category.toLowerCase().includes(term)) return false;
       return true;
     }).slice(0, 30);
-  }, [term, cat, foodDb, diet]);
+  }, [term, cat, merged, diet]);
 
   const getQty = (id: string) => qty[id] ?? qtyFromQuery;
 
