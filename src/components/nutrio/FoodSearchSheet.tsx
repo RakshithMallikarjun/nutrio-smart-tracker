@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { X, Search, Plus, Minus, Mic } from "lucide-react";
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { useDietPref } from "@/hooks/use-diet-pref";
+import { useCustomFoods } from "@/hooks/use-custom-foods";
 import { isAllowed, parseQty, scaleFood, type DietPref } from "@/lib/quantity";
 
 type Props = {
@@ -10,6 +11,7 @@ type Props = {
   defaultMeal: MealType;
   onAdd: (food: Food, meal: MealType) => void;
   onVoice?: () => void;
+  userId?: string;
 };
 
 const DIET_LABELS: Record<DietPref, string> = {
