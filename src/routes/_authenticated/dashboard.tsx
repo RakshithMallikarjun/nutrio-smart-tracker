@@ -60,6 +60,8 @@ function Dashboard() {
   const [barcodeOpen, setBarcodeOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [bootLoading, setBootLoading] = useState(true);
+  const [editEntry, setEditEntry] = useState<MealRow | null>(null);
+
 
   useEffect(() => {
     const t = setTimeout(() => setBootLoading(false), 700);
