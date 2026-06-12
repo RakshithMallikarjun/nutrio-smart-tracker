@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X, Check } from "lucide-react";
 import type { MealRow } from "@/hooks/use-nutrio-cloud";
+import { track } from "@/lib/analytics";
 
 type Patch = Partial<Pick<MealRow, "serving" | "calories" | "protein" | "carbs" | "fat" | "fiber">>;
 
@@ -45,6 +46,7 @@ export function EditMealSheet({ entry, onClose, onSave }: Props) {
       fat: Math.max(0, nums.fat ?? 0),
       fiber: Math.max(0, nums.fiber ?? 0),
     });
+    track("meal_edited", { food_name: entry.food_name });
     onClose();
   };
 

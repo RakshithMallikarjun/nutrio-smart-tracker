@@ -6,6 +6,7 @@ import { findFood, MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/l
 import { scaleFood, smartMultiplier } from "@/lib/quantity";
 import { useCustomFoods } from "@/hooks/use-custom-foods";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 
 type Props = {
   open: boolean;
@@ -101,6 +102,7 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Pro
       });
       if (resolved.length === 0) toast.error("Couldn't detect any food");
       setItems(resolved);
+      track("voice_log_result", { item_count: resolved.length });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not parse");
     } finally {
@@ -156,11 +158,14 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Pro
 
   const confirm = () => {
     const ok = items.filter((i) => i.matched);
-    ok.forEach((i) => onAdd(i.food, meal));
     if (ok.length === 0) {
       toast.error("No matched foods to add");
       return;
     }
+    ok.forEach((i) => {
+      onAdd(i.food, meal);
+      track("voice_log_confirmed", { food_name: i.food.name, meal });
+    });
     toast.success(`Added ${ok.length} item${ok.length === 1 ? "" : "s"} to ${MEAL_LABELS[meal]}`);
     setItems([]);
     setTranscript("");

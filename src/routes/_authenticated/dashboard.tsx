@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { identifyUser, track, resetUser } from "@/lib/analytics";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -68,6 +69,12 @@ function Dashboard() {
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    if (user?.id && store.displayName && store.displayName !== "there") {
+      identifyUser(user.id, store.displayName);
+    }
+  }, [user?.id, store.displayName]);
+
   // Restore last-selected meal across sessions.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -88,6 +95,7 @@ function Dashboard() {
   const mealsForActive = mealMap.get(activeMeal) ?? [];
 
   const confirmSignOut = async () => {
+    resetUser();
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   };
@@ -161,13 +169,13 @@ function Dashboard() {
 
       {/* Quick actions */}
       <div className="mx-5 mt-3 grid grid-cols-3 gap-2">
-        <QuickAction icon={<Mic size={16} />} label="Voice" onClick={() => setVoiceOpen(true)} />
-        <QuickAction icon={<Camera size={16} />} label="Scan dish" onClick={() => setAiOpen(true)} />
-        <QuickAction icon={<ScanBarcode size={16} />} label="Barcode" onClick={() => setBarcodeOpen(true)} />
+        <QuickAction icon={<Mic size={16} />} label="Voice" onClick={() => { setVoiceOpen(true); track("voice_log_opened"); }} />
+        <QuickAction icon={<Camera size={16} />} label="Scan dish" onClick={() => { setAiOpen(true); track("ai_scan_opened"); }} />
+        <QuickAction icon={<ScanBarcode size={16} />} label="Barcode" onClick={() => { setBarcodeOpen(true); track("barcode_opened"); }} />
       </div>
 
       {/* Water widget */}
-      <button onClick={() => setWaterOpen(true)} className="mx-5 mt-3 flex w-[calc(100%-2.5rem)] items-center justify-between rounded-[1.5rem] bg-white p-3.5 text-left sage-border-soft">
+      <button onClick={() => { setWaterOpen(true); track("water_opened"); }} className="mx-5 mt-3 flex w-[calc(100%-2.5rem)] items-center justify-between rounded-[1.5rem] bg-white p-3.5 text-left sage-border-soft">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: "rgba(202,0,19,0.1)" }}>
             <Droplet size={20} color="#ca0013" />
@@ -202,7 +210,7 @@ function Dashboard() {
             return (
               <button
                 key={m}
-                onClick={() => setActiveMeal(m)}
+                onClick={() => { setActiveMeal(m); track("meal_tab_switched", { meal: m }); }}
                 className="flex items-center gap-2.5 rounded-2xl p-2.5 text-left transition-colors"
                 style={{
                   backgroundColor: active ? "#171e19" : "#ffffff",
@@ -234,7 +242,7 @@ function Dashboard() {
             {MEAL_LABELS[activeMeal]}
             <span className="ml-1.5 text-sm" style={{ color: "#b7c6c2" }}>· {mealsForActive.length}</span>
           </h2>
-          <button onClick={() => setFoodOpen(true)} className="text-label" style={{ color: "#ca0013" }}>+ Add</button>
+          <button onClick={() => { setFoodOpen(true); track("add_food_opened", { source: "meal_header", meal: activeMeal }); }} className="text-label" style={{ color: "#ca0013" }}>+ Add</button>
         </div>
 
         {mealsForActive.length === 0 ? (
@@ -256,10 +264,10 @@ function Dashboard() {
                     {m.serving} · {Math.round(m.calories)} kcal · P{Math.round(m.protein)} C{Math.round(m.carbs)} F{Math.round(m.fat)}
                   </p>
                 </div>
-                <button onClick={() => setEditEntry(m)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-cream" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Edit">
+                <button onClick={() => { setEditEntry(m); track("meal_edit_opened", { food_name: m.food_name }); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-cream" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Edit">
                   <Pencil size={14} />
                 </button>
-                <button onClick={() => store.removeMeal(m.id)} className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-vibrant" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Remove">
+                <button onClick={() => { store.removeMeal(m.id); track("meal_removed", { food_name: m.food_name, meal_type: m.meal_type }); }} className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-vibrant" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Remove">
                   <Trash2 size={15} className="group-hover:text-white" />
                 </button>
               </li>
@@ -276,7 +284,7 @@ function Dashboard() {
           if (t === "water") setWaterOpen(true);
           if (t === "profile") navigate({ to: "/goals" });
         }}
-        onAdd={() => setFoodOpen(true)}
+        onAdd={() => { setFoodOpen(true); track("add_food_opened", { source: "fab" }); }}
       />
 
       <FoodSearchSheet
