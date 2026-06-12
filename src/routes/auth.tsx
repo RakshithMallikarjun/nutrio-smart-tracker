@@ -4,6 +4,7 @@ import { Mail, Lock, Loader2, Phone, KeyRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -44,9 +45,11 @@ function AuthPage() {
         });
         if (error) throw error;
         toast.success("Account created! You're signed in.");
+        track("user_signed_up", { method: "email" });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        track("user_signed_in", { method: "email" });
       }
       navigate({ to: "/", replace: true });
     } catch (err) {
@@ -83,6 +86,7 @@ function AuthPage() {
         type: "sms",
       });
       if (error) throw error;
+      track("user_signed_in", { method: "phone_otp" });
       navigate({ to: "/", replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Invalid OTP");
@@ -103,6 +107,7 @@ function AuthPage() {
     }
     if (result.redirected) return;
     navigate({ to: "/", replace: true });
+    track("user_signed_in", { method: provider });
   };
 
   return (

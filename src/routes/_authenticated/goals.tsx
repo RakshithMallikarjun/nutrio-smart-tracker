@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDietPref } from "@/hooks/use-diet-pref";
 import type { DietPref } from "@/lib/quantity";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 
 export const Route = createFileRoute("/_authenticated/goals")({
   head: () => ({ meta: [{ title: "Goals — Nutrio" }] }),
@@ -92,6 +93,7 @@ function GoalsPage() {
 
   const applyAuto = () => {
     setGoals(calculated);
+    track("goals_auto_calculated", { goal_type: goalType, calories: calculated.calories });
     toast.success("Goals auto-calculated");
   };
 
@@ -111,6 +113,12 @@ function GoalsPage() {
       return;
     }
     toast.success("Saved");
+    track("goals_saved", {
+      goal_type: goalType,
+      calories: goals.calories,
+      protein: goals.protein,
+      activity,
+    });
     navigate({ to: "/dashboard" });
   };
 

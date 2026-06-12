@@ -4,6 +4,7 @@ import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-
 import { useDietPref } from "@/hooks/use-diet-pref";
 import { useCustomFoods } from "@/hooks/use-custom-foods";
 import { isAllowed, parseQty, scaleFood, type DietPref } from "@/lib/quantity";
+import { track } from "@/lib/analytics";
 
 type Props = {
   open: boolean;
@@ -65,6 +66,12 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
       return true;
     }).slice(0, 30);
   }, [term, cat, merged, diet]);
+
+  useEffect(() => {
+    if (term.length < 2) return;
+    const t = setTimeout(() => track("food_searched", { term, category: cat }), 600);
+    return () => clearTimeout(t);
+  }, [term, cat]);
 
   const getQty = (id: string) => qty[id] ?? qtyFromQuery;
 
@@ -213,7 +220,15 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
                 </div>
                 <button
                   onClick={() => {
-                    onAdd(scaleFood(f, n), meal);
+                    const scaled = scaleFood(f, n);
+                    onAdd(scaled, meal);
+                    track("food_added", {
+                      food_name: f.name,
+                      category: f.category,
+                      meal,
+                      quantity: n,
+                      calories: Math.round(f.calories * n),
+                    });
                     onClose();
                   }}
                   className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-vibrant hover:text-white"

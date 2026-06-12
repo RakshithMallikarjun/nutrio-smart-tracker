@@ -5,6 +5,7 @@ import { recognizeFoods, type RecognizedFood } from "@/lib/ai-food.functions";
 import { MEAL_EMOJI, MEAL_LABELS, type MealType, type Food } from "@/lib/nutrio-data";
 import { useCustomFoods } from "@/hooks/use-custom-foods";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 
 type Props = {
   open: boolean;
@@ -70,6 +71,11 @@ export function AiPhotoSheet({ open, onClose, onAdd, userId }: Props) {
       const r = await recognize({ data: { imageDataUrl: dataUrl } });
       setCandidates(r.candidates);
       setSelectedIdx(0);
+      track("ai_scan_result", {
+        candidates: r.candidates.length,
+        top_confidence: r.candidates[0]?.confidence ?? "none",
+        top_food: r.candidates[0]?.name ?? "unknown",
+      });
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Could not analyze image");
     } finally {
@@ -93,6 +99,11 @@ export function AiPhotoSheet({ open, onClose, onAdd, userId }: Props) {
 
   const confirm = () => {
     if (!selected) return;
+    track("ai_scan_confirmed", {
+      food_name: selected.name,
+      confidence: selected.confidence,
+      meal,
+    });
     onAdd(toFood(selected), meal);
     toast.success(`Added ${selected.name} to ${MEAL_LABELS[meal]}`);
     reset();

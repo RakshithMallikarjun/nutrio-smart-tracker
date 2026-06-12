@@ -1,4 +1,5 @@
 import { X, Droplet, Undo2 } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 type Props = {
   open: boolean;
@@ -47,7 +48,10 @@ export function WaterSheet({ open, onClose, total, goal, onAdd, onUndo }: Props)
           {QUICK.map((ml) => (
             <button
               key={ml}
-              onClick={() => onAdd(ml)}
+              onClick={() => {
+                onAdd(ml);
+                track("water_logged", { amount_ml: ml });
+              }}
               className="flex flex-col items-center gap-1 rounded-2xl bg-cream py-5 font-extrabold text-charcoal transition-transform hover:scale-[1.02] active:scale-95 sage-border-soft"
             >
               <Droplet size={20} color="#ca0013" />
