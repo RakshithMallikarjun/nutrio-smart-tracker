@@ -12,8 +12,10 @@ import { WaterSheet } from "@/components/nutrio/WaterSheet";
 import { AiPhotoSheet } from "@/components/nutrio/AiPhotoSheet";
 import { VoiceLogSheet } from "@/components/nutrio/VoiceLogSheet";
 import { BarcodeSheet } from "@/components/nutrio/BarcodeSheet";
+import { EditMealSheet } from "@/components/nutrio/EditMealSheet";
 import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
 import { Walkthrough } from "@/components/nutrio/Walkthrough";
+import type { MealRow } from "@/hooks/use-nutrio-cloud";
 import {
   Dialog,
   DialogContent,
