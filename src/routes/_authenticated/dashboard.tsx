@@ -283,6 +283,7 @@ function Dashboard() {
         open={foodOpen}
         onClose={() => setFoodOpen(false)}
         defaultMeal={activeMeal}
+        userId={user?.id}
         onVoice={() => {
           setFoodOpen(false);
           setVoiceOpen(true);
@@ -306,6 +307,7 @@ function Dashboard() {
       <AiPhotoSheet
         open={aiOpen}
         onClose={() => setAiOpen(false)}
+        userId={user?.id}
         onAdd={(food, meal) => {
           store.addFood(food, meal);
           setActiveMeal(meal);
@@ -316,6 +318,7 @@ function Dashboard() {
         open={voiceOpen}
         onClose={() => setVoiceOpen(false)}
         defaultMeal={activeMeal}
+        userId={user?.id}
         onAdd={(food, meal) => {
           store.addFood(food, meal);
           setActiveMeal(meal);
@@ -331,6 +334,16 @@ function Dashboard() {
           setActiveMeal(meal);
         }}
       />
+
+      <EditMealSheet
+        entry={editEntry}
+        onClose={() => setEditEntry(null)}
+        onSave={(id, patch) => {
+          store.updateMeal(id, patch);
+          toast.success("Entry updated");
+        }}
+      />
+
 
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent className="sm:max-w-sm">
