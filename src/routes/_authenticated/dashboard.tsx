@@ -256,6 +256,9 @@ function Dashboard() {
                     {m.serving} · {Math.round(m.calories)} kcal · P{Math.round(m.protein)} C{Math.round(m.carbs)} F{Math.round(m.fat)}
                   </p>
                 </div>
+                <button onClick={() => setEditEntry(m)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-cream" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Edit">
+                  <Pencil size={14} />
+                </button>
                 <button onClick={() => store.removeMeal(m.id)} className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-vibrant" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Remove">
                   <Trash2 size={15} className="group-hover:text-white" />
                 </button>
