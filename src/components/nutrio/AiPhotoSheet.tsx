@@ -1,13 +1,15 @@
 import { useRef, useState } from "react";
-import { X, Camera, Sparkles, Loader2, RotateCcw, Check } from "lucide-react";
+import { X, Camera, Sparkles, Loader2, RotateCcw, Check, BookmarkPlus } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { recognizeFood, type RecognizedFood } from "@/lib/ai-food.functions";
+import { recognizeFoods, type RecognizedFood } from "@/lib/ai-food.functions";
 import { MEAL_EMOJI, MEAL_LABELS, type MealType, type Food } from "@/lib/nutrio-data";
+import { useCustomFoods } from "@/hooks/use-custom-foods";
 import { toast } from "sonner";
 
 type Props = {
   open: boolean;
   onClose: () => void;
+  userId?: string;
   onAdd: (food: Food, meal: MealType) => void;
 };
 
@@ -36,17 +38,26 @@ function downscale(file: File): Promise<string> {
   });
 }
 
-export function AiPhotoSheet({ open, onClose, onAdd }: Props) {
+const CONF_COLOR: Record<RecognizedFood["confidence"], string> = {
+  high: "#7a9990",
+  medium: "#ca0013",
+  low: "#b7c6c2",
+};
+
+export function AiPhotoSheet({ open, onClose, onAdd, userId }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<RecognizedFood | null>(null);
+  const [candidates, setCandidates] = useState<RecognizedFood[]>([]);
+  const [selectedIdx, setSelectedIdx] = useState(0);
   const [meal, setMeal] = useState<MealType>("breakfast");
-  const recognize = useServerFn(recognizeFood);
+  const recognize = useServerFn(recognizeFoods);
+  const { addCustomFood } = useCustomFoods(userId);
 
   const reset = () => {
     setPreview(null);
-    setResult(null);
+    setCandidates([]);
+    setSelectedIdx(0);
     setLoading(false);
   };
 
@@ -57,7 +68,8 @@ export function AiPhotoSheet({ open, onClose, onAdd }: Props) {
       setPreview(dataUrl);
       setLoading(true);
       const r = await recognize({ data: { imageDataUrl: dataUrl } });
-      setResult(r);
+      setCandidates(r.candidates);
+      setSelectedIdx(0);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Could not analyze image");
     } finally {
@@ -65,23 +77,45 @@ export function AiPhotoSheet({ open, onClose, onAdd }: Props) {
     }
   };
 
+  const selected = candidates[selectedIdx];
+
+  const toFood = (c: RecognizedFood): Food => ({
+    id: `ai-${Date.now()}`,
+    name: c.name,
+    category: "AI Scan",
+    serving: c.serving,
+    calories: c.calories,
+    protein: c.protein,
+    carbs: c.carbs,
+    fat: c.fat,
+    fiber: c.fiber,
+  });
+
   const confirm = () => {
-    if (!result) return;
-    const food: Food = {
-      id: `ai-${Date.now()}`,
-      name: result.name,
-      category: "AI Scan",
-      serving: result.serving,
-      calories: result.calories,
-      protein: result.protein,
-      carbs: result.carbs,
-      fat: result.fat,
-      fiber: result.fiber,
-    };
-    onAdd(food, meal);
-    toast.success(`Added ${result.name} to ${MEAL_LABELS[meal]}`);
+    if (!selected) return;
+    onAdd(toFood(selected), meal);
+    toast.success(`Added ${selected.name} to ${MEAL_LABELS[meal]}`);
     reset();
     onClose();
+  };
+
+  const saveToMyFoods = async () => {
+    if (!selected) return;
+    try {
+      await addCustomFood({
+        name: selected.name,
+        category: "My Foods",
+        serving: selected.serving,
+        calories: selected.calories,
+        protein: selected.protein,
+        carbs: selected.carbs,
+        fat: selected.fat,
+        fiber: selected.fiber,
+      });
+      toast.success("Saved to My Foods");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save");
+    }
   };
 
   if (!open) return null;
@@ -90,10 +124,7 @@ export function AiPhotoSheet({ open, onClose, onAdd }: Props) {
     <div
       className="fixed inset-0 z-50 flex items-end justify-center"
       style={{ backgroundColor: "rgba(23,30,25,0.4)" }}
-      onClick={() => {
-        reset();
-        onClose();
-      }}
+      onClick={() => { reset(); onClose(); }}
     >
       <div
         className="animate-fade-in flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto rounded-t-[2.5rem] bg-white p-6 pb-32"
@@ -101,22 +132,12 @@ export function AiPhotoSheet({ open, onClose, onAdd }: Props) {
       >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-full"
-              style={{ backgroundColor: "rgba(202,0,19,0.1)" }}
-            >
+            <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: "rgba(202,0,19,0.1)" }}>
               <Sparkles size={16} color="#ca0013" />
             </div>
             <h2 className="text-xl font-black text-charcoal">AI Food Scan</h2>
           </div>
-          <button
-            onClick={() => {
-              reset();
-              onClose();
-            }}
-            className="flex h-10 w-10 items-center justify-center rounded-full sage-border"
-            aria-label="Close"
-          >
+          <button onClick={() => { reset(); onClose(); }} className="flex h-10 w-10 items-center justify-center rounded-full sage-border" aria-label="Close">
             <X size={18} />
           </button>
         </div>
@@ -139,15 +160,12 @@ export function AiPhotoSheet({ open, onClose, onAdd }: Props) {
             onClick={() => inputRef.current?.click()}
             className="flex h-56 w-full flex-col items-center justify-center gap-3 rounded-[2rem] bg-cream sage-border-soft"
           >
-            <div
-              className="flex h-16 w-16 items-center justify-center rounded-full"
-              style={{ backgroundColor: "#ca0013" }}
-            >
+            <div className="flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: "#ca0013" }}>
               <Camera size={28} color="#fff" />
             </div>
             <p className="text-sm font-extrabold text-charcoal">Take or upload a photo</p>
             <p className="px-6 text-center text-xs font-bold" style={{ color: "#b7c6c2" }}>
-              AI will identify the dish and estimate calories & macros.
+              AI will suggest the top 3 dishes with confidence — pick the right one.
             </p>
           </button>
         )}
@@ -161,52 +179,55 @@ export function AiPhotoSheet({ open, onClose, onAdd }: Props) {
                 <p className="text-sm font-extrabold text-white">Analyzing…</p>
               </div>
             )}
+            {!loading && (
+              <button
+                onClick={() => inputRef.current?.click()}
+                className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white sage-border"
+                aria-label="Retake"
+              >
+                <RotateCcw size={15} />
+              </button>
+            )}
           </div>
         )}
 
-        {result && !loading && (
-          <div className="mt-4 space-y-4">
-            <div className="rounded-2xl bg-white p-4 sage-border">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-label" style={{ color: "#b7c6c2" }}>
-                    Detected · {result.confidence} confidence
-                  </p>
-                  <p className="text-lg font-black text-charcoal">{result.name}</p>
-                  <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>
-                    {result.serving}
-                  </p>
-                </div>
-                <button
-                  onClick={() => inputRef.current?.click()}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full sage-border"
-                  aria-label="Retake"
-                >
-                  <RotateCcw size={15} />
-                </button>
-              </div>
-              <div className="mt-3 grid grid-cols-5 gap-2 text-center">
-                {[
-                  { l: "Kcal", v: result.calories },
-                  { l: "P", v: result.protein },
-                  { l: "C", v: result.carbs },
-                  { l: "F", v: result.fat },
-                  { l: "Fib", v: result.fiber },
-                ].map((s) => (
-                  <div key={s.l} className="rounded-xl bg-cream py-2">
-                    <p className="text-sm font-black text-charcoal">{s.v}</p>
-                    <p className="text-[10px] font-bold" style={{ color: "#b7c6c2" }}>
-                      {s.l}
-                    </p>
-                  </div>
-                ))}
-              </div>
+        {candidates.length > 0 && !loading && (
+          <div className="mt-4 space-y-3">
+            <p className="text-label" style={{ color: "#b7c6c2" }}>Top {candidates.length} {candidates.length === 1 ? "match" : "matches"} — tap to select</p>
+            <div className="space-y-2">
+              {candidates.map((c, i) => {
+                const active = i === selectedIdx;
+                return (
+                  <button
+                    key={`${c.name}-${i}`}
+                    onClick={() => setSelectedIdx(i)}
+                    className="w-full rounded-2xl p-3 text-left transition-colors"
+                    style={{
+                      backgroundColor: active ? "#171e19" : "#ffffff",
+                      border: active ? "none" : "1px solid rgba(183,198,194,0.5)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-black" style={{ color: active ? "#fff" : "#171e19" }}>{c.name}</p>
+                        <p className="truncate text-[11px] font-bold" style={{ color: active ? "rgba(255,255,255,0.6)" : "#b7c6c2" }}>
+                          {c.serving} · {c.calories} kcal · P{c.protein} C{c.carbs} F{c.fat}
+                        </p>
+                      </div>
+                      <span
+                        className="shrink-0 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white"
+                        style={{ backgroundColor: CONF_COLOR[c.confidence] }}
+                      >
+                        {c.confidence}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             <div>
-              <p className="mb-2 text-label" style={{ color: "#b7c6c2" }}>
-                Add to
-              </p>
+              <p className="mb-2 text-label" style={{ color: "#b7c6c2" }}>Add to</p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {(Object.keys(MEAL_LABELS) as MealType[]).map((m) => {
                   const active = m === meal;
@@ -229,13 +250,23 @@ export function AiPhotoSheet({ open, onClose, onAdd }: Props) {
               </div>
             </div>
 
-            <button
-              onClick={confirm}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-full text-base font-black text-white"
-              style={{ backgroundColor: "#ca0013" }}
-            >
-              <Check size={18} /> Add to {MEAL_LABELS[meal]}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={saveToMyFoods}
+                disabled={!userId}
+                className="flex h-12 shrink-0 items-center justify-center gap-1 rounded-full bg-cream px-4 text-xs font-extrabold text-charcoal sage-border-soft disabled:opacity-50"
+                aria-label="Save to My Foods"
+              >
+                <BookmarkPlus size={14} /> Save
+              </button>
+              <button
+                onClick={confirm}
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-sm font-black text-white"
+                style={{ backgroundColor: "#ca0013" }}
+              >
+                <Check size={16} /> Add to {MEAL_LABELS[meal]}
+              </button>
+            </div>
           </div>
         )}
       </div>

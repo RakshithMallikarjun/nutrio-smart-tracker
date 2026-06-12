@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode } from "lucide-react";
+import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
@@ -12,8 +12,10 @@ import { WaterSheet } from "@/components/nutrio/WaterSheet";
 import { AiPhotoSheet } from "@/components/nutrio/AiPhotoSheet";
 import { VoiceLogSheet } from "@/components/nutrio/VoiceLogSheet";
 import { BarcodeSheet } from "@/components/nutrio/BarcodeSheet";
+import { EditMealSheet } from "@/components/nutrio/EditMealSheet";
 import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
 import { Walkthrough } from "@/components/nutrio/Walkthrough";
+import type { MealRow } from "@/hooks/use-nutrio-cloud";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +60,8 @@ function Dashboard() {
   const [barcodeOpen, setBarcodeOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [bootLoading, setBootLoading] = useState(true);
+  const [editEntry, setEditEntry] = useState<MealRow | null>(null);
+
 
   useEffect(() => {
     const t = setTimeout(() => setBootLoading(false), 700);
@@ -252,6 +256,9 @@ function Dashboard() {
                     {m.serving} · {Math.round(m.calories)} kcal · P{Math.round(m.protein)} C{Math.round(m.carbs)} F{Math.round(m.fat)}
                   </p>
                 </div>
+                <button onClick={() => setEditEntry(m)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-cream" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Edit">
+                  <Pencil size={14} />
+                </button>
                 <button onClick={() => store.removeMeal(m.id)} className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-vibrant" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Remove">
                   <Trash2 size={15} className="group-hover:text-white" />
                 </button>
@@ -276,6 +283,7 @@ function Dashboard() {
         open={foodOpen}
         onClose={() => setFoodOpen(false)}
         defaultMeal={activeMeal}
+        userId={user?.id}
         onVoice={() => {
           setFoodOpen(false);
           setVoiceOpen(true);
@@ -299,6 +307,7 @@ function Dashboard() {
       <AiPhotoSheet
         open={aiOpen}
         onClose={() => setAiOpen(false)}
+        userId={user?.id}
         onAdd={(food, meal) => {
           store.addFood(food, meal);
           setActiveMeal(meal);
@@ -309,6 +318,7 @@ function Dashboard() {
         open={voiceOpen}
         onClose={() => setVoiceOpen(false)}
         defaultMeal={activeMeal}
+        userId={user?.id}
         onAdd={(food, meal) => {
           store.addFood(food, meal);
           setActiveMeal(meal);
@@ -324,6 +334,16 @@ function Dashboard() {
           setActiveMeal(meal);
         }}
       />
+
+      <EditMealSheet
+        entry={editEntry}
+        onClose={() => setEditEntry(null)}
+        onSave={(id, patch) => {
+          store.updateMeal(id, patch);
+          toast.success("Entry updated");
+        }}
+      />
+
 
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent className="sm:max-w-sm">

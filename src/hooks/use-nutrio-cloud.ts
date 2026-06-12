@@ -109,6 +109,19 @@ export function useNutrioCloud(userId: string | undefined) {
     },
   });
 
+  type MealPatch = Partial<Pick<MealRow, "serving" | "calories" | "protein" | "carbs" | "fat" | "fiber">>;
+  const updateMealMutation = useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: MealPatch }) => {
+      const { error } = await supabase.from("meal_entries").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onMutate: async ({ id, patch }) => {
+      qc.setQueryData<MealRow[]>(["meals", userId, date], (prev = []) =>
+        prev.map((m) => (m.id === id ? ({ ...m, ...patch } as MealRow) : m)),
+      );
+    },
+  });
+
   const addWaterMutation = useMutation({
     mutationFn: async (ml: number) => {
       if (!userId) throw new Error("Unauthorized");
@@ -169,6 +182,8 @@ export function useNutrioCloud(userId: string | undefined) {
     displayName,
     addFood: (food: Food, mealType: MealType) => addFoodMutation.mutate({ food, mealType }),
     removeMeal: (id: string) => removeMealMutation.mutate(id),
+    updateMeal: (id: string, patch: Partial<Pick<MealRow, "serving" | "calories" | "protein" | "carbs" | "fat" | "fiber">>) =>
+      updateMealMutation.mutate({ id, patch }),
     addWater: (ml: number) => addWaterMutation.mutate(ml),
     undoWater: () => lastWater && undoWaterMutation.mutate(lastWater.id),
     loaded: true,
