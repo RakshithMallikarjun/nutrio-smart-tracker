@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode } from "lucide-react";
+import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
