@@ -169,7 +169,7 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
 
         {/* Category chips */}
         <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
-          {["All", ...foodCategories].map((c) => {
+          {["All", ...categories].map((c) => {
             const active = c === cat;
             return (
               <button
