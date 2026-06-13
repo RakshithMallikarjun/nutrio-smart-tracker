@@ -1,6 +1,12 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Save, Loader2, Calculator, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Calculator, ChevronDown, ChevronUp, Bell, BellOff } from "lucide-react";
+import {
+  getRemindersEnabled,
+  requestAndEnableReminders,
+  disableReminders,
+} from "@/lib/notifications";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useDietPref } from "@/hooks/use-diet-pref";
 import type { DietPref } from "@/lib/quantity";
@@ -66,6 +72,31 @@ function GoalsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showMacros, setShowMacros] = useState(false);
+  const [remindersOn, setRemindersOn] = useState(false);
+  const [requestingPerm, setRequestingPerm] = useState(false);
+
+  useEffect(() => {
+    setRemindersOn(getRemindersEnabled());
+  }, []);
+
+  const toggleReminders = async () => {
+    if (remindersOn) {
+      disableReminders();
+      setRemindersOn(false);
+      toast.success("Meal reminders turned off");
+    } else {
+      setRequestingPerm(true);
+      const granted = await requestAndEnableReminders();
+      setRequestingPerm(false);
+      if (granted) {
+        setRemindersOn(true);
+        toast.success("Meal reminders enabled! You'll be reminded at 8am, 1pm, 4pm, and 7:30pm.");
+      } else {
+        toast.error("Notification permission denied. Enable it in your browser/device settings.");
+      }
+    }
+  };
+
 
   useEffect(() => {
     if (!user?.id) return;
