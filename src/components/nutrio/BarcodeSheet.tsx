@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X, ScanBarcode, Loader2, Check } from "lucide-react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
+
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { toast } from "sonner";
 
@@ -84,6 +84,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
         };
         rafRef.current = requestAnimationFrame(tick);
       } else {
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
         const reader = new BrowserMultiFormatReader();
         zxingRef.current = reader;
         reader.decodeFromVideoElement(videoRef.current!, (result) => {
@@ -94,6 +95,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
           }
         });
       }
+
     } catch {
       toast.error("Camera access denied");
     }
