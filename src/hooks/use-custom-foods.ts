@@ -74,8 +74,29 @@ export function useCustomFoods(userId: string | undefined) {
     },
   });
 
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const rawId = id.startsWith("cf-") ? id.slice(3) : id;
+      const { error } = await supabase
+        .from("custom_foods")
+        .delete()
+        .eq("id", rawId)
+        .eq("user_id", userId!);
+      if (error) throw error;
+      return rawId;
+    },
+    onSuccess: (rawId) => {
+      qc.setQueryData<CustomFoodRow[]>(["custom_foods", userId], (prev = []) =>
+        prev.filter((r) => r.id !== rawId)
+      );
+    },
+  });
+
   return {
     customFoods: rows.map(toFood),
     addCustomFood: add.mutateAsync,
+    deleteCustomFood: remove.mutateAsync,
+    isAdding: add.isPending,
   };
 }
+
