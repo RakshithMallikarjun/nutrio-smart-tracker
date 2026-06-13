@@ -32,6 +32,7 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Pro
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<Resolved[]>([]);
   const [meal, setMeal] = useState<MealType>(defaultMeal);
+  const [savedIdxs, setSavedIdxs] = useState<Set<number>>(new Set());
   const recRef = useRef<any>(null);
   const parse = useServerFn(parseFoodText);
   const estimate = useServerFn(estimateFood);
@@ -40,6 +41,7 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Pro
   useEffect(() => {
     if (!open) return;
     setMeal(defaultMeal);
+    setSavedIdxs(new Set());
     const SR: any =
       (typeof window !== "undefined" && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition));
     setSupported(!!SR);
@@ -101,6 +103,7 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Pro
         };
       });
       if (resolved.length === 0) toast.error("Couldn't detect any food");
+      setSavedIdxs(new Set());
       setItems(resolved);
       track("voice_log_result", { item_count: resolved.length });
     } catch (e) {
@@ -137,6 +140,7 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Pro
   };
 
   const saveAt = async (idx: number) => {
+    if (savedIdxs.has(idx)) return;
     const it = items[idx];
     if (!it || !userId) return;
     try {
@@ -150,29 +154,32 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Pro
         fat: it.food.fat,
         fiber: it.food.fiber,
       });
-      toast.success("Saved to My Foods");
+      setSavedIdxs((prev) => new Set([...prev, idx]));
+      toast.success(`"${it.food.name}" saved to My Foods ✓`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save");
     }
   };
 
   const confirm = () => {
-    const ok = items.filter((i) => i.matched);
+    const ok = items.filter((i) => i.matched && i.food.calories > 0);
     if (ok.length === 0) {
-      toast.error("No matched foods to add");
+      toast.error("No matched foods to add. Use 'Estimate with AI' first.");
       return;
     }
     ok.forEach((i) => {
       onAdd(i.food, meal);
       track("voice_log_confirmed", { food_name: i.food.name, meal });
     });
-    toast.success(`Added ${ok.length} item${ok.length === 1 ? "" : "s"} to ${MEAL_LABELS[meal]}`);
+    toast.success(`✓ Added ${ok.length} item${ok.length === 1 ? "" : "s"} to ${MEAL_LABELS[meal]}`);
     setItems([]);
     setTranscript("");
     onClose();
   };
 
   if (!open) return null;
+
+  const addableCount = items.filter((i) => i.matched && i.food.calories > 0).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(23,30,25,0.4)" }} onClick={onClose}>
@@ -268,9 +275,14 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Pro
                     {it.matched && userId && it.food.calories > 0 && (
                       <button
                         onClick={() => saveAt(idx)}
-                        className="mt-2 flex items-center gap-1 rounded-full bg-cream px-3 py-1.5 text-[11px] font-extrabold text-charcoal sage-border-soft"
+                        disabled={savedIdxs.has(idx)}
+                        className="mt-2 flex items-center gap-1 rounded-full bg-cream px-3 py-1.5 text-[11px] font-extrabold sage-border-soft disabled:opacity-60"
+                        style={{ color: savedIdxs.has(idx) ? "#7a9990" : "#171e19" }}
                       >
-                        <BookmarkPlus size={12} color="#ca0013" /> Save to My Foods
+                        {savedIdxs.has(idx)
+                          ? <><Check size={12} /> Saved</>
+                          : <><BookmarkPlus size={12} color="#ca0013" /> Save to My Foods</>
+                        }
                       </button>
                     )}
                   </div>
@@ -305,7 +317,7 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Pro
                   className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-full text-base font-black text-white"
                   style={{ backgroundColor: "#ca0013" }}
                 >
-                  <Check size={18} /> Add {items.filter((i) => i.matched).length} item(s)
+                  <Check size={18} /> Add {addableCount} item{addableCount === 1 ? "" : "s"} to {MEAL_LABELS[meal]}
                 </button>
               </div>
             )}

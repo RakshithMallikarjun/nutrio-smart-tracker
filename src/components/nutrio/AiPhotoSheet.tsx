@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Camera, Sparkles, Loader2, RotateCcw, Check, BookmarkPlus } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { recognizeFoods, type RecognizedFood } from "@/lib/ai-food.functions";
@@ -52,15 +52,21 @@ export function AiPhotoSheet({ open, onClose, onAdd, userId }: Props) {
   const [candidates, setCandidates] = useState<RecognizedFood[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [meal, setMeal] = useState<MealType>("breakfast");
+  const [saved, setSaved] = useState(false);
+  const [adding, setAdding] = useState(false);
   const recognize = useServerFn(recognizeFoods);
-  const { addCustomFood } = useCustomFoods(userId);
+  const { addCustomFood, isAdding } = useCustomFoods(userId);
 
   const reset = () => {
     setPreview(null);
     setCandidates([]);
     setSelectedIdx(0);
     setLoading(false);
+    setSaved(false);
+    setAdding(false);
   };
+
+  useEffect(() => { setSaved(false); }, [selectedIdx]);
 
   const handleFile = async (file: File) => {
     try {
@@ -97,21 +103,26 @@ export function AiPhotoSheet({ open, onClose, onAdd, userId }: Props) {
     fiber: c.fiber,
   });
 
-  const confirm = () => {
-    if (!selected) return;
-    track("ai_scan_confirmed", {
-      food_name: selected.name,
-      confidence: selected.confidence,
-      meal,
-    });
-    onAdd(toFood(selected), meal);
-    toast.success(`Added ${selected.name} to ${MEAL_LABELS[meal]}`);
-    reset();
-    onClose();
+  const confirm = async () => {
+    if (!selected || adding) return;
+    setAdding(true);
+    try {
+      track("ai_scan_confirmed", {
+        food_name: selected.name,
+        confidence: selected.confidence,
+        meal,
+      });
+      onAdd(toFood(selected), meal);
+      toast.success(`✓ ${selected.name} added to ${MEAL_LABELS[meal]}`);
+      reset();
+      onClose();
+    } finally {
+      setAdding(false);
+    }
   };
 
   const saveToMyFoods = async () => {
-    if (!selected) return;
+    if (!selected || saved || isAdding) return;
     try {
       await addCustomFood({
         name: selected.name,
@@ -123,7 +134,8 @@ export function AiPhotoSheet({ open, onClose, onAdd, userId }: Props) {
         fat: selected.fat,
         fiber: selected.fiber,
       });
-      toast.success("Saved to My Foods");
+      setSaved(true);
+      toast.success(`"${selected.name}" saved to My Foods ✓`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save");
     }
@@ -264,18 +276,26 @@ export function AiPhotoSheet({ open, onClose, onAdd, userId }: Props) {
             <div className="flex gap-2">
               <button
                 onClick={saveToMyFoods}
-                disabled={!userId}
-                className="flex h-12 shrink-0 items-center justify-center gap-1 rounded-full bg-cream px-4 text-xs font-extrabold text-charcoal sage-border-soft disabled:opacity-50"
+                disabled={!userId || saved || isAdding}
+                className="flex h-12 shrink-0 items-center justify-center gap-1 rounded-full bg-cream px-4 text-xs font-extrabold text-charcoal sage-border-soft disabled:opacity-60"
                 aria-label="Save to My Foods"
               >
-                <BookmarkPlus size={14} /> Save
+                {isAdding ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : saved ? (
+                  <><Check size={14} /> Saved</>
+                ) : (
+                  <><BookmarkPlus size={14} /> Save</>
+                )}
               </button>
               <button
                 onClick={confirm}
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-sm font-black text-white"
+                disabled={adding}
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-sm font-black text-white disabled:opacity-70"
                 style={{ backgroundColor: "#ca0013" }}
               >
-                <Check size={16} /> Add to {MEAL_LABELS[meal]}
+                {adding ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                {adding ? "Adding…" : `Add to ${MEAL_LABELS[meal]}`}
               </button>
             </div>
           </div>

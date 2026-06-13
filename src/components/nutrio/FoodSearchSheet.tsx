@@ -1,10 +1,13 @@
 import { useMemo, useState, useEffect } from "react";
-import { X, Search, Plus, Minus, Mic } from "lucide-react";
+import { X, Search, Plus, Minus, Mic, Trash2, Loader2 } from "lucide-react";
+
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { useDietPref } from "@/hooks/use-diet-pref";
 import { useCustomFoods } from "@/hooks/use-custom-foods";
 import { isAllowed, parseQty, scaleFood, type DietPref } from "@/lib/quantity";
 import { track } from "@/lib/analytics";
+import { toast } from "sonner";
+
 
 type Props = {
   open: boolean;
@@ -31,7 +34,23 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
   const [foodCategories, setFoodCategories] = useState<string[]>([]);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [diet, setDiet] = useDietPref();
-  const { customFoods } = useCustomFoods(userId);
+  const { customFoods, deleteCustomFood } = useCustomFoods(userId);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (food: Food) => {
+    if (!food.id || deletingId) return;
+    setDeletingId(food.id);
+    try {
+      await deleteCustomFood(food.id);
+      toast.success(`"${food.name}" removed from My Foods`);
+      if (cat === "My Foods" && results.length <= 1) setCat("All");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not delete");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
 
   useEffect(() => {
     if (!open) return;
@@ -201,7 +220,21 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
             const n = getQty(f.id);
             const set = (v: number) => setQty({ ...qty, [f.id]: Math.max(0.5, Math.round(v * 2) / 2) });
             return (
-              <div key={f.id} className="flex items-center gap-2 rounded-2xl bg-white p-3 sage-border">
+              <div key={f.id} className="group relative flex items-center gap-2 rounded-2xl bg-white p-3 sage-border">
+                {f.category === "My Foods" && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(f); }}
+                    disabled={deletingId === f.id}
+                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
+                    style={{ backgroundColor: "rgba(202,0,19,0.1)" }}
+                    aria-label={`Delete ${f.name}`}
+                  >
+                    {deletingId === f.id
+                      ? <Loader2 size={12} className="animate-spin" color="#ca0013" />
+                      : <Trash2 size={12} color="#ca0013" />}
+                  </button>
+                )}
+
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-base font-extrabold text-charcoal">{f.name}</p>
                   <p className="truncate text-[10px] font-bold uppercase tracking-wider" style={{ color: "#ca0013" }}>{f.category}</p>

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode, Pencil } from "lucide-react";
+import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode, Pencil, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
@@ -62,6 +62,8 @@ function Dashboard() {
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [bootLoading, setBootLoading] = useState(true);
   const [editEntry, setEditEntry] = useState<MealRow | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
 
 
   useEffect(() => {
@@ -317,8 +319,11 @@ function Dashboard() {
         onClose={() => setAiOpen(false)}
         userId={user?.id}
         onAdd={(food, meal) => {
+          setSyncing(true);
           store.addFood(food, meal);
           setActiveMeal(meal);
+          toast.success(`✓ ${food.name} added to ${MEAL_LABELS[meal]}`);
+          setTimeout(() => setSyncing(false), 1500);
         }}
       />
 
@@ -328,8 +333,11 @@ function Dashboard() {
         defaultMeal={activeMeal}
         userId={user?.id}
         onAdd={(food, meal) => {
+          setSyncing(true);
           store.addFood(food, meal);
           setActiveMeal(meal);
+          toast.success(`✓ ${food.name} added to ${MEAL_LABELS[meal]}`);
+          setTimeout(() => setSyncing(false), 1500);
         }}
       />
 
@@ -338,10 +346,21 @@ function Dashboard() {
         onClose={() => setBarcodeOpen(false)}
         defaultMeal={activeMeal}
         onAdd={(food, meal) => {
+          setSyncing(true);
           store.addFood(food, meal);
           setActiveMeal(meal);
+          toast.success(`✓ ${food.name} added to ${MEAL_LABELS[meal]}`);
+          setTimeout(() => setSyncing(false), 1500);
         }}
       />
+
+      {syncing && (
+        <div className="fixed bottom-24 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white px-4 py-2 shadow-lg sage-border">
+          <Loader2 size={14} className="animate-spin" color="#ca0013" />
+          <span className="text-xs font-extrabold text-charcoal">Updating your log…</span>
+        </div>
+      )}
+
 
       <EditMealSheet
         entry={editEntry}
