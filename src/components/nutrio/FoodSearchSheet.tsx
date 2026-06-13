@@ -6,6 +6,8 @@ import { useDietPref } from "@/hooks/use-diet-pref";
 import { useCustomFoods } from "@/hooks/use-custom-foods";
 import { isAllowed, parseQty, scaleFood, type DietPref } from "@/lib/quantity";
 import { track } from "@/lib/analytics";
+import { toast } from "sonner";
+
 
 type Props = {
   open: boolean;
