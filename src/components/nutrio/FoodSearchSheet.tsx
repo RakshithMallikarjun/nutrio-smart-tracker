@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
-import { X, Search, Plus, Minus, Mic } from "lucide-react";
+import { X, Search, Plus, Minus, Mic, Trash2, Loader2 } from "lucide-react";
+
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { useDietPref } from "@/hooks/use-diet-pref";
 import { useCustomFoods } from "@/hooks/use-custom-foods";
@@ -31,7 +32,23 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
   const [foodCategories, setFoodCategories] = useState<string[]>([]);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [diet, setDiet] = useDietPref();
-  const { customFoods } = useCustomFoods(userId);
+  const { customFoods, deleteCustomFood } = useCustomFoods(userId);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (food: Food) => {
+    if (!food.id || deletingId) return;
+    setDeletingId(food.id);
+    try {
+      await deleteCustomFood(food.id);
+      toast.success(`"${food.name}" removed from My Foods`);
+      if (cat === "My Foods" && results.length <= 1) setCat("All");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not delete");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
 
   useEffect(() => {
     if (!open) return;

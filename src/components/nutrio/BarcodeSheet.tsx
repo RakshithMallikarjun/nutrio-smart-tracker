@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X, ScanBarcode, Loader2, Check } from "lucide-react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { toast } from "sonner";
 
@@ -14,6 +15,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
+  const zxingRef = useRef<any>(null);
   const [supported, setSupported] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -26,7 +28,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
   useEffect(() => {
     if (!open) return;
     setMeal(defaultMeal);
-    setSupported(typeof window !== "undefined" && "BarcodeDetector" in window);
+    setSupported(typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia);
     return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -34,9 +36,19 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
   const stop = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
+    try { zxingRef.current?.reset?.(); } catch { /* noop */ }
+    zxingRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setScanning(false);
+  };
+
+  const clear = () => {
+    setCode("");
+    setFound(null);
+    setNotFound(false);
+    setManual("");
+    setLoading(false);
   };
 
   const start = async () => {
@@ -50,23 +62,38 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
         await videoRef.current.play();
       }
       setScanning(true);
-      const Detector = (window as any).BarcodeDetector;
-      const detector = new Detector({
-        formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"],
-      });
-      const tick = async () => {
-        if (!videoRef.current || !streamRef.current) return;
-        try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes[0]?.rawValue) {
-            stop();
-            lookup(codes[0].rawValue);
-            return;
-          }
-        } catch { /* ignore frame errors */ }
+
+      const hasNative = typeof window !== "undefined" && "BarcodeDetector" in window;
+
+      if (hasNative) {
+        const Detector = (window as any).BarcodeDetector;
+        const detector = new Detector({
+          formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "qr_code"],
+        });
+        const tick = async () => {
+          if (!videoRef.current || !streamRef.current) return;
+          try {
+            const codes = await detector.detect(videoRef.current);
+            if (codes[0]?.rawValue) {
+              stop();
+              lookup(codes[0].rawValue);
+              return;
+            }
+          } catch { /* ignore frame errors */ }
+          rafRef.current = requestAnimationFrame(tick);
+        };
         rafRef.current = requestAnimationFrame(tick);
-      };
-      rafRef.current = requestAnimationFrame(tick);
+      } else {
+        const reader = new BrowserMultiFormatReader();
+        zxingRef.current = reader;
+        reader.decodeFromVideoElement(videoRef.current!, (result) => {
+          if (result) {
+            const text = result.getText();
+            stop();
+            lookup(text);
+          }
+        });
+      }
     } catch {
       toast.error("Camera access denied");
     }
@@ -87,14 +114,13 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
       const p = json.product;
       const n = p.nutriments || {};
       const serving = p.serving_size || "100g";
-      const factor = p.serving_size && n["energy-kcal_serving"] ? 1 : 1; // OFF already gives _serving when available
       const cals = n["energy-kcal_serving"] ?? n["energy-kcal_100g"] ?? 0;
       const food: Food = {
         id: `bc-${barcode}`,
         name: [p.brands, p.product_name].filter(Boolean).join(" — ") || "Scanned product",
         category: "Scanned",
         serving,
-        calories: Math.round(Number(cals) * factor),
+        calories: Math.round(Number(cals)),
         protein: Math.round((n.proteins_serving ?? n.proteins_100g ?? 0) * 10) / 10,
         carbs: Math.round((n.carbohydrates_serving ?? n.carbohydrates_100g ?? 0) * 10) / 10,
         fat: Math.round((n.fat_serving ?? n.fat_100g ?? 0) * 10) / 10,
@@ -119,6 +145,8 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
 
   if (!open) return null;
 
+  const meals = Object.keys(MEAL_LABELS) as MealType[];
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(23,30,25,0.4)" }} onClick={() => { stop(); onClose(); }}>
       <div className="animate-fade-in flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto rounded-t-[2.5rem] bg-white p-6 pb-32" onClick={(e) => e.stopPropagation()}>
@@ -133,12 +161,6 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
             <X size={18} />
           </button>
         </div>
-
-        {!supported && (
-          <p className="mb-3 rounded-2xl bg-cream p-3 text-center text-xs font-bold text-charcoal">
-            Live scanning needs Chrome on Android. You can still enter a barcode manually below.
-          </p>
-        )}
 
         {supported && !found && !notFound && (
           <div className="relative overflow-hidden rounded-[2rem] bg-cream">
@@ -156,14 +178,30 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
           </div>
         )}
 
+        <p className="mt-3 text-center text-[11px] font-bold" style={{ color: "#b7c6c2" }}>
+          Point camera at a barcode or QR code — works on Android & iOS.
+        </p>
+
         <div className="mt-3 flex gap-2">
-          <input
-            value={manual}
-            onChange={(e) => setManual(e.target.value.replace(/\D/g, ""))}
-            inputMode="numeric"
-            placeholder="Or enter barcode digits"
-            className="flex-1 rounded-2xl bg-cream px-4 py-3 text-sm font-bold text-charcoal outline-none sage-border-soft"
-          />
+          <div className="relative flex-1">
+            <input
+              value={manual}
+              onChange={(e) => setManual(e.target.value.replace(/\D/g, ""))}
+              inputMode="numeric"
+              placeholder="Or enter barcode digits"
+              className="w-full rounded-2xl bg-cream px-4 py-3 pr-10 text-sm font-bold text-charcoal outline-none sage-border-soft"
+            />
+            {manual.length > 0 && (
+              <button
+                onClick={() => setManual("")}
+                className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full"
+                style={{ backgroundColor: "rgba(183,198,194,0.4)" }}
+                aria-label="Clear input"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
           <button
             onClick={() => manual && lookup(manual)}
             disabled={!manual || loading}
@@ -185,6 +223,15 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
           <p className="mt-3 rounded-2xl bg-cream p-3 text-center text-xs font-bold text-charcoal">
             Product not found for {code}. Search manually instead.
           </p>
+        )}
+
+        {(found || notFound || code) && !loading && (
+          <button
+            onClick={clear}
+            className="mt-3 w-full rounded-full bg-cream py-2.5 text-xs font-extrabold text-charcoal sage-border-soft"
+          >
+            Clear & scan again
+          </button>
         )}
 
         {found && (
@@ -211,22 +258,31 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
 
             <div>
               <p className="mb-2 text-label" style={{ color: "#b7c6c2" }}>Add to</p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {(Object.keys(MEAL_LABELS) as MealType[]).map((m) => {
+              <div className="flex gap-2">
+                {meals.map((m) => {
                   const active = m === meal;
+                  if (active) {
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => setMeal(m)}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-full py-2 pl-3 pr-4 text-sm font-extrabold"
+                        style={{ backgroundColor: "#171e19", color: "#ffffff" }}
+                      >
+                        <span>{MEAL_EMOJI[m]}</span>
+                        {MEAL_LABELS[m]}
+                      </button>
+                    );
+                  }
                   return (
                     <button
                       key={m}
                       onClick={() => setMeal(m)}
-                      className="flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-extrabold"
-                      style={{
-                        backgroundColor: active ? "#171e19" : "#ffffff",
-                        color: active ? "#ffffff" : "#171e19",
-                        border: active ? "none" : "1px solid rgba(183,198,194,0.5)",
-                      }}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
+                      style={{ border: "1px solid rgba(183,198,194,0.5)" }}
+                      aria-label={MEAL_LABELS[m]}
                     >
-                      <span>{MEAL_EMOJI[m]}</span>
-                      {MEAL_LABELS[m]}
+                      {MEAL_EMOJI[m]}
                     </button>
                   );
                 })}
