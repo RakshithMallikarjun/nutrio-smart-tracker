@@ -259,6 +259,37 @@ function GoalsPage() {
         </div>
       )}
 
+      {/* Meal Reminders */}
+      <section className="mx-5 mt-4 rounded-2xl bg-white p-4 sage-border">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: remindersOn ? "rgba(202,0,19,0.1)" : "rgba(183,198,194,0.3)" }}>
+            {remindersOn
+              ? <Bell size={18} color="#ca0013" />
+              : <BellOff size={18} color="#b7c6c2" />
+            }
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-extrabold text-charcoal">Meal reminders</p>
+            <p className="text-[11px] font-bold" style={{ color: "#b7c6c2" }}>
+              {remindersOn ? "On · 8am, 1pm, 4pm, 7:30pm" : "Remind me to log meals"}
+            </p>
+          </div>
+          <button
+            onClick={toggleReminders}
+            disabled={requestingPerm}
+            className="rounded-full px-4 py-2 text-xs font-extrabold disabled:opacity-60"
+            style={{
+              backgroundColor: remindersOn ? "#171e19" : "#ca0013",
+              color: "#ffffff",
+            }}
+          >
+            {requestingPerm ? "…" : remindersOn ? "Turn off" : "Enable"}
+          </button>
+        </div>
+      </section>
+
+
+
       <button onClick={save} disabled={saving || loading} className="mx-5 mt-6 flex w-[calc(100%-2.5rem)] items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-extrabold text-white disabled:opacity-60" style={{ backgroundColor: "#ca0013" }}>
         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
         Save goals
