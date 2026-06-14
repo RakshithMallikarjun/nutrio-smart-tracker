@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { MealType, Food } from "@/lib/nutrio-data";
 import { useMemo } from "react";
+import { toast } from "sonner";
 
 export type Goals = {
   calories: number;
