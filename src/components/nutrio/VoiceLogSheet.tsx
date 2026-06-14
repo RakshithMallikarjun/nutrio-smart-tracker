@@ -162,20 +162,26 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd, onAdd
     }
   };
 
-  const confirm = () => {
+  const confirm = async () => {
     const ok = items.filter((i) => i.matched && i.food.calories > 0);
     if (ok.length === 0) {
       toast.error("No matched foods to add. Use 'Estimate with AI' first.");
       return;
     }
-    ok.forEach((i) => {
-      onAdd(i.food, meal);
-      track("voice_log_confirmed", { food_name: i.food.name, meal });
-    });
-    toast.success(`✓ Added ${ok.length} item${ok.length === 1 ? "" : "s"} to ${MEAL_LABELS[meal]}`);
-    setItems([]);
-    setTranscript("");
-    onClose();
+    try {
+      if (onAddMany) {
+        await onAddMany(ok.map((i) => ({ food: i.food, meal })));
+      } else {
+        ok.forEach((i) => onAdd(i.food, meal));
+      }
+      ok.forEach((i) => track("voice_log_confirmed", { food_name: i.food.name, meal }));
+      toast.success(`✓ Added ${ok.length} item${ok.length === 1 ? "" : "s"} to ${MEAL_LABELS[meal]}`);
+      setItems([]);
+      setTranscript("");
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not add items");
+    }
   };
 
   if (!open) return null;
