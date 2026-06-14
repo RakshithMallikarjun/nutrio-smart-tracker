@@ -16,7 +16,7 @@ type Props = {
   onClose: () => void;
   defaultMeal: MealType;
   onAdd: (food: Food, meal: MealType) => void;
-  onVoice?: () => void;
+  userId?: string;
   userId?: string;
 };
 
