@@ -242,7 +242,7 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder='Try "2 idlis" or "pizza"'
-            className="w-full rounded-2xl bg-cream py-3 pl-11 pr-20 text-base font-semibold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
+            className="w-full rounded-2xl bg-cream py-3 pl-11 pr-28 text-base font-semibold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
           />
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
             {q && (
@@ -254,18 +254,19 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
                 <X size={14} color="#b7c6c2" />
               </button>
             )}
-            {onVoice && (
-              <button
-                onClick={onVoice}
-                aria-label="Voice search"
-                className="flex h-8 w-8 items-center justify-center rounded-full"
-                style={{ backgroundColor: "#ca0013" }}
-              >
-                <Mic size={14} color="#ffffff" />
-              </button>
-            )}
+            <button
+              onClick={runAiAnalyze}
+              disabled={aiLoading || !q.trim()}
+              aria-label="Analyze with AI"
+              className="flex h-8 items-center gap-1 rounded-full px-3 text-[11px] font-extrabold text-white disabled:opacity-50"
+              style={{ backgroundColor: "#ca0013" }}
+            >
+              {aiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              AI
+            </button>
           </div>
         </div>
+
 
         {/* Category chips */}
         <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
