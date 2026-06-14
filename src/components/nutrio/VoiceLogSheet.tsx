@@ -35,9 +35,19 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd, onAdd
   const [meal, setMeal] = useState<MealType>(defaultMeal);
   const [savedIdxs, setSavedIdxs] = useState<Set<number>>(new Set());
   const recRef = useRef<any>(null);
+  const heardRef = useRef<HTMLTextAreaElement | null>(null);
   const parse = useServerFn(parseFoodText);
   const estimate = useServerFn(estimateFood);
   const { addCustomFood } = useCustomFoods(userId);
+
+  // Autofocus the editable Heard field when speech recognition ends with a transcript.
+  useEffect(() => {
+    if (!listening && transcript && heardRef.current) {
+      heardRef.current.focus();
+      heardRef.current.setSelectionRange(transcript.length, transcript.length);
+    }
+  }, [listening]);
+
 
   useEffect(() => {
     if (!open) return;
