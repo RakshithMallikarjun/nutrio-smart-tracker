@@ -15,6 +15,7 @@ import { BarcodeSheet } from "@/components/nutrio/BarcodeSheet";
 import { EditMealSheet } from "@/components/nutrio/EditMealSheet";
 import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
 import { Walkthrough } from "@/components/nutrio/Walkthrough";
+import { ReminderConsentModal } from "@/components/nutrio/ReminderConsentModal";
 import type { MealRow } from "@/hooks/use-nutrio-cloud";
 import {
   Dialog,
@@ -113,6 +114,7 @@ function Dashboard() {
   return (
     <div className="mx-auto min-h-screen w-full max-w-md pb-32" style={{ backgroundColor: "#eeebe3" }}>
       <Walkthrough />
+      <ReminderConsentModal userId={user?.id} />
 
       {/* Header */}
       <header className="flex items-center justify-between px-5 pt-12">
