@@ -84,19 +84,22 @@ export function useNutrioCloud(userId: string | undefined) {
     enabled: !!userId,
   });
 
-  const addFoodMutation = useMutation({
-    mutationFn: async ({ food, mealType }: { food: Food; mealType: MealType }) => {
+  const addFoodsMutation = useMutation({
+    mutationFn: async (items: { food: Food; mealType: MealType }[]) => {
       if (!userId) throw new Error("Unauthorized");
-      const { data, error } = await supabase.from("meal_entries").insert({
+      if (items.length === 0) return [] as MealRow[];
+      const rows = items.map(({ food, mealType }) => ({
         user_id: userId, food_name: food.name, serving: food.serving,
         calories: food.calories, protein: food.protein, carbs: food.carbs,
         fat: food.fat, fiber: food.fiber, meal_type: mealType,
-      }).select().single();
+      }));
+      const { data, error } = await supabase.from("meal_entries").insert(rows).select();
       if (error) throw error;
-      return data as MealRow;
+      return (data ?? []) as MealRow[];
     },
-    onSuccess: (newRow) => {
-      qc.setQueryData<MealRow[]>(["meals", userId, date], (prev = []) => [...prev, newRow]);
+    onSuccess: (newRows) => {
+      if (newRows.length === 0) return;
+      qc.setQueryData<MealRow[]>(["meals", userId, date], (prev = []) => [...prev, ...newRows]);
     },
   });
 
