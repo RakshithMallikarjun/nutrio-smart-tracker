@@ -1,10 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
-import { X, Search, Plus, Minus, Mic, Trash2, Loader2 } from "lucide-react";
+import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus, Check } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { useDietPref } from "@/hooks/use-diet-pref";
 import { useCustomFoods } from "@/hooks/use-custom-foods";
 import { isAllowed, parseQty, scaleFood, type DietPref } from "@/lib/quantity";
+import { estimateFood } from "@/lib/ai-food.functions";
 import { track } from "@/lib/analytics";
 import { toast } from "sonner";
 
