@@ -14,6 +14,7 @@ type Props = {
   defaultMeal: MealType;
   userId?: string;
   onAdd: (food: Food, meal: MealType) => void;
+  onAddMany?: (items: { food: Food; meal: MealType }[]) => Promise<unknown> | void;
 };
 
 type Resolved = {
