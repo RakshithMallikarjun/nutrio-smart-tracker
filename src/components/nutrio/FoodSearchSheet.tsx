@@ -17,7 +17,6 @@ type Props = {
   defaultMeal: MealType;
   onAdd: (food: Food, meal: MealType) => void;
   userId?: string;
-  userId?: string;
 };
 
 const DIET_LABELS: Record<DietPref, string> = {
