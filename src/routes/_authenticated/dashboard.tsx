@@ -301,11 +301,6 @@ function Dashboard() {
           setActiveMeal(meal);
           toast.success(`Added to ${MEAL_LABELS[meal]}`);
         }}
-        onAdd={(food, meal) => {
-          store.addFood(food, meal);
-          setActiveMeal(meal);
-          toast.success(`Added to ${MEAL_LABELS[meal]}`);
-        }}
       />
 
       <WaterSheet
