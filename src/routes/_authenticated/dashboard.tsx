@@ -296,9 +296,10 @@ function Dashboard() {
         onClose={() => setFoodOpen(false)}
         defaultMeal={activeMeal}
         userId={user?.id}
-        onVoice={() => {
-          setFoodOpen(false);
-          setVoiceOpen(true);
+        onAdd={(food, meal) => {
+          store.addFood(food, meal);
+          setActiveMeal(meal);
+          toast.success(`Added to ${MEAL_LABELS[meal]}`);
         }}
         onAdd={(food, meal) => {
           store.addFood(food, meal);
