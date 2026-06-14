@@ -28,7 +28,7 @@ const DIET_LABELS: Record<DietPref, string> = {
   vegan: "Vegan",
 };
 
-export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, userId }: Props) {
+export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: Props) {
   const [q, setQ] = useState("");
   const [meal, setMeal] = useState<MealType>(defaultMeal);
   const [cat, setCat] = useState<string>("All");
@@ -36,8 +36,79 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
   const [foodCategories, setFoodCategories] = useState<string[]>([]);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [diet, setDiet] = useDietPref();
-  const { customFoods, deleteCustomFood } = useCustomFoods(userId);
+  const { customFoods, deleteCustomFood, addCustomFood } = useCustomFoods(userId);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const estimateFn = useServerFn(estimateFood);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiPreview, setAiPreview] = useState<Food | null>(null);
+  const [aiSaving, setAiSaving] = useState(false);
+
+  const runAiAnalyze = async () => {
+    const term = q.trim();
+    if (!term) {
+      toast.error("Type a food name first");
+      return;
+    }
+    setAiLoading(true);
+    setAiPreview(null);
+    try {
+      const r = await estimateFn({ data: { name: term } });
+      setAiPreview({
+        id: `ai-${Date.now()}`,
+        name: r.name,
+        category: "AI Estimate",
+        serving: r.serving,
+        calories: r.calories,
+        protein: r.protein,
+        carbs: r.carbs,
+        fat: r.fat,
+        fiber: r.fiber,
+      });
+      track("food_ai_analyzed", { term });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not analyze");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const aiAddToLog = () => {
+    if (!aiPreview) return;
+    onAdd(aiPreview, meal);
+    toast.success(`✓ Added to ${MEAL_LABELS[meal]}`);
+    track("food_added", { food_name: aiPreview.name, category: "AI Estimate", meal, quantity: 1, calories: aiPreview.calories });
+    setAiPreview(null);
+    setQ("");
+    onClose();
+  };
+
+  const aiSaveToMyFoods = async () => {
+    if (!aiPreview || !userId) return;
+    const dup = customFoods.find((f) => f.name.trim().toLowerCase() === aiPreview.name.trim().toLowerCase());
+    if (dup) {
+      toast.info("Already saved in My Foods");
+      return;
+    }
+    setAiSaving(true);
+    try {
+      await addCustomFood({
+        name: aiPreview.name,
+        category: "My Foods",
+        serving: aiPreview.serving,
+        calories: aiPreview.calories,
+        protein: aiPreview.protein,
+        carbs: aiPreview.carbs,
+        fat: aiPreview.fat,
+        fiber: aiPreview.fiber,
+      });
+      toast.success("✓ Saved to My Foods");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setAiSaving(false);
+    }
+  };
 
   const handleDelete = async (food: Food) => {
     if (!food.id || deletingId) return;
@@ -52,6 +123,7 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
       setDeletingId(null);
     }
   };
+
 
 
   useEffect(() => {
