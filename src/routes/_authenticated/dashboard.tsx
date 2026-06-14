@@ -336,10 +336,20 @@ function Dashboard() {
           setSyncing(true);
           store.addFood(food, meal);
           setActiveMeal(meal);
-          toast.success(`✓ ${food.name} added to ${MEAL_LABELS[meal]}`);
           setTimeout(() => setSyncing(false), 1500);
         }}
+        onAddMany={async (items) => {
+          if (items.length === 0) return;
+          setSyncing(true);
+          try {
+            await store.addFoods(items.map((i) => ({ food: i.food, mealType: i.meal })));
+            setActiveMeal(items[items.length - 1].meal);
+          } finally {
+            setTimeout(() => setSyncing(false), 1500);
+          }
+        }}
       />
+
 
       <BarcodeSheet
         open={barcodeOpen}
