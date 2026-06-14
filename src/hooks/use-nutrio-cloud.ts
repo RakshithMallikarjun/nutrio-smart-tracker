@@ -183,7 +183,12 @@ export function useNutrioCloud(userId: string | undefined) {
     totals,
     waterTotal,
     displayName,
-    addFood: (food: Food, mealType: MealType) => addFoodMutation.mutate({ food, mealType }),
+    addFood: (food: Food, mealType: MealType) =>
+      addFoodsMutation.mutate([{ food, mealType }], {
+        onError: (e) => toast.error(e instanceof Error ? e.message : "Could not add food"),
+      }),
+    addFoods: (items: { food: Food; mealType: MealType }[]) =>
+      addFoodsMutation.mutateAsync(items),
     removeMeal: (id: string) => removeMealMutation.mutate(id),
     updateMeal: (id: string, patch: Partial<Pick<MealRow, "serving" | "calories" | "protein" | "carbs" | "fat" | "fiber">>) =>
       updateMealMutation.mutate({ id, patch }),
