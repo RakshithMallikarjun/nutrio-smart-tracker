@@ -405,8 +405,6 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
               Showing top 30 — refine your search.
             </p>
           )}
-          {/* keep Check import alive */}
-          <span className="hidden"><Check size={1} /></span>
         </div>
       </div>
     </div>
