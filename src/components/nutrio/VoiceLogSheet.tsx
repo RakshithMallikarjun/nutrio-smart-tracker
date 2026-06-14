@@ -26,7 +26,7 @@ type Resolved = {
   estimating?: boolean;
 };
 
-export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd }: Props) {
+export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd, onAddMany }: Props) {
   const [supported, setSupported] = useState(true);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
