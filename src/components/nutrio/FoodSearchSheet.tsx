@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus, Check } from "lucide-react";
+import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
