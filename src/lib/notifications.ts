@@ -70,3 +70,16 @@ export function scheduleLocalReminders() {
 
   localStorage.setItem(ALARM_KEY, JSON.stringify(ids));
 }
+
+// Future reminder helpers — used by upcoming meal/water reminder scheduling
+export function hasReminderConsent(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(LS_KEY) !== null;
+}
+
+export function canReceiveReminders(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!("Notification" in window)) return false;
+  return getRemindersEnabled() && Notification.permission === "granted";
+}
+

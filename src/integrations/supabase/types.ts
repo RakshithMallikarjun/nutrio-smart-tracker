@@ -153,6 +153,9 @@ export type Database = {
           height_cm: number | null
           id: string
           name: string | null
+          notification_consent_date: string | null
+          notifications_enabled: boolean
+          notifications_prompt_completed: boolean
           updated_at: string
           weight_kg: number | null
         }
@@ -165,6 +168,9 @@ export type Database = {
           height_cm?: number | null
           id: string
           name?: string | null
+          notification_consent_date?: string | null
+          notifications_enabled?: boolean
+          notifications_prompt_completed?: boolean
           updated_at?: string
           weight_kg?: number | null
         }
@@ -177,6 +183,9 @@ export type Database = {
           height_cm?: number | null
           id?: string
           name?: string | null
+          notification_consent_date?: string | null
+          notifications_enabled?: boolean
+          notifications_prompt_completed?: boolean
           updated_at?: string
           weight_kg?: number | null
         }
