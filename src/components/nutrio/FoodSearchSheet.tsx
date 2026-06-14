@@ -347,16 +347,66 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
               </div>
             );
           })}
-          {results.length === 0 && (
-            <p className="py-8 text-center text-sm font-bold" style={{ color: "#b7c6c2" }}>
-              No foods found. Try another search.
-            </p>
+          {aiPreview && (
+            <div className="rounded-2xl p-4 sage-border" style={{ backgroundColor: "#fffdf6" }}>
+              <div className="mb-2 flex items-center gap-1.5">
+                <Sparkles size={12} color="#ca0013" />
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#ca0013" }}>AI Estimate</p>
+              </div>
+              <p className="text-base font-extrabold text-charcoal">{aiPreview.name}</p>
+              <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>
+                {aiPreview.serving} · {aiPreview.calories} kcal · P{aiPreview.protein} C{aiPreview.carbs} F{aiPreview.fat}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={aiAddToLog}
+                  className="flex items-center gap-1 rounded-full px-4 py-2 text-xs font-extrabold text-white"
+                  style={{ backgroundColor: "#ca0013" }}
+                >
+                  <Plus size={12} /> Add to Log
+                </button>
+                {userId && (
+                  <button
+                    onClick={aiSaveToMyFoods}
+                    disabled={aiSaving}
+                    className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-charcoal sage-border-soft disabled:opacity-60"
+                  >
+                    {aiSaving ? <Loader2 size={12} className="animate-spin" /> : <BookmarkPlus size={12} color="#ca0013" />}
+                    Save to My Foods
+                  </button>
+                )}
+                <button
+                  onClick={() => setAiPreview(null)}
+                  className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-charcoal sage-border-soft"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {results.length === 0 && !aiPreview && (
+            <div className="py-8 text-center">
+              <p className="text-sm font-bold" style={{ color: "#b7c6c2" }}>No foods found</p>
+              {q.trim() && (
+                <button
+                  onClick={runAiAnalyze}
+                  disabled={aiLoading}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-extrabold text-white disabled:opacity-60"
+                  style={{ backgroundColor: "#ca0013" }}
+                >
+                  {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  Analyze with AI
+                </button>
+              )}
+            </div>
           )}
           {results.length === 30 && (
             <p className="py-4 text-center text-xs font-bold" style={{ color: "#b7c6c2" }}>
               Showing top 30 — refine your search.
             </p>
           )}
+          {/* keep Check import alive */}
+          <span className="hidden"><Check size={1} /></span>
         </div>
       </div>
     </div>
