@@ -1,10 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
-import { X, Search, Plus, Minus, Mic, Trash2, Loader2 } from "lucide-react";
+import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { useDietPref } from "@/hooks/use-diet-pref";
 import { useCustomFoods } from "@/hooks/use-custom-foods";
 import { isAllowed, parseQty, scaleFood, type DietPref } from "@/lib/quantity";
+import { estimateFood } from "@/lib/ai-food.functions";
 import { track } from "@/lib/analytics";
 import { toast } from "sonner";
 
@@ -14,7 +16,6 @@ type Props = {
   onClose: () => void;
   defaultMeal: MealType;
   onAdd: (food: Food, meal: MealType) => void;
-  onVoice?: () => void;
   userId?: string;
 };
 
@@ -26,7 +27,7 @@ const DIET_LABELS: Record<DietPref, string> = {
   vegan: "Vegan",
 };
 
-export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, userId }: Props) {
+export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: Props) {
   const [q, setQ] = useState("");
   const [meal, setMeal] = useState<MealType>(defaultMeal);
   const [cat, setCat] = useState<string>("All");
@@ -34,8 +35,79 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
   const [foodCategories, setFoodCategories] = useState<string[]>([]);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [diet, setDiet] = useDietPref();
-  const { customFoods, deleteCustomFood } = useCustomFoods(userId);
+  const { customFoods, deleteCustomFood, addCustomFood } = useCustomFoods(userId);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const estimateFn = useServerFn(estimateFood);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiPreview, setAiPreview] = useState<Food | null>(null);
+  const [aiSaving, setAiSaving] = useState(false);
+
+  const runAiAnalyze = async () => {
+    const term = q.trim();
+    if (!term) {
+      toast.error("Type a food name first");
+      return;
+    }
+    setAiLoading(true);
+    setAiPreview(null);
+    try {
+      const r = await estimateFn({ data: { name: term } });
+      setAiPreview({
+        id: `ai-${Date.now()}`,
+        name: r.name,
+        category: "AI Estimate",
+        serving: r.serving,
+        calories: r.calories,
+        protein: r.protein,
+        carbs: r.carbs,
+        fat: r.fat,
+        fiber: r.fiber,
+      });
+      track("food_ai_analyzed", { term });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not analyze");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const aiAddToLog = () => {
+    if (!aiPreview) return;
+    onAdd(aiPreview, meal);
+    toast.success(`✓ Added to ${MEAL_LABELS[meal]}`);
+    track("food_added", { food_name: aiPreview.name, category: "AI Estimate", meal, quantity: 1, calories: aiPreview.calories });
+    setAiPreview(null);
+    setQ("");
+    onClose();
+  };
+
+  const aiSaveToMyFoods = async () => {
+    if (!aiPreview || !userId) return;
+    const dup = customFoods.find((f) => f.name.trim().toLowerCase() === aiPreview.name.trim().toLowerCase());
+    if (dup) {
+      toast.info("Already saved in My Foods");
+      return;
+    }
+    setAiSaving(true);
+    try {
+      await addCustomFood({
+        name: aiPreview.name,
+        category: "My Foods",
+        serving: aiPreview.serving,
+        calories: aiPreview.calories,
+        protein: aiPreview.protein,
+        carbs: aiPreview.carbs,
+        fat: aiPreview.fat,
+        fiber: aiPreview.fiber,
+      });
+      toast.success("✓ Saved to My Foods");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setAiSaving(false);
+    }
+  };
 
   const handleDelete = async (food: Food) => {
     if (!food.id || deletingId) return;
@@ -50,6 +122,7 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
       setDeletingId(null);
     }
   };
+
 
 
   useEffect(() => {
@@ -168,7 +241,7 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder='Try "2 idlis" or "pizza"'
-            className="w-full rounded-2xl bg-cream py-3 pl-11 pr-20 text-base font-semibold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
+            className="w-full rounded-2xl bg-cream py-3 pl-11 pr-28 text-base font-semibold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
           />
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
             {q && (
@@ -180,18 +253,19 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
                 <X size={14} color="#b7c6c2" />
               </button>
             )}
-            {onVoice && (
-              <button
-                onClick={onVoice}
-                aria-label="Voice search"
-                className="flex h-8 w-8 items-center justify-center rounded-full"
-                style={{ backgroundColor: "#ca0013" }}
-              >
-                <Mic size={14} color="#ffffff" />
-              </button>
-            )}
+            <button
+              onClick={runAiAnalyze}
+              disabled={aiLoading || !q.trim()}
+              aria-label="Analyze with AI"
+              className="flex h-8 items-center gap-1 rounded-full px-3 text-[11px] font-extrabold text-white disabled:opacity-50"
+              style={{ backgroundColor: "#ca0013" }}
+            >
+              {aiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              AI
+            </button>
           </div>
         </div>
+
 
         {/* Category chips */}
         <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
@@ -273,10 +347,58 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, onVoice, us
               </div>
             );
           })}
-          {results.length === 0 && (
-            <p className="py-8 text-center text-sm font-bold" style={{ color: "#b7c6c2" }}>
-              No foods found. Try another search.
-            </p>
+          {aiPreview && (
+            <div className="rounded-2xl p-4 sage-border" style={{ backgroundColor: "#fffdf6" }}>
+              <div className="mb-2 flex items-center gap-1.5">
+                <Sparkles size={12} color="#ca0013" />
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#ca0013" }}>AI Estimate</p>
+              </div>
+              <p className="text-base font-extrabold text-charcoal">{aiPreview.name}</p>
+              <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>
+                {aiPreview.serving} · {aiPreview.calories} kcal · P{aiPreview.protein} C{aiPreview.carbs} F{aiPreview.fat}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={aiAddToLog}
+                  className="flex items-center gap-1 rounded-full px-4 py-2 text-xs font-extrabold text-white"
+                  style={{ backgroundColor: "#ca0013" }}
+                >
+                  <Plus size={12} /> Add to Log
+                </button>
+                {userId && (
+                  <button
+                    onClick={aiSaveToMyFoods}
+                    disabled={aiSaving}
+                    className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-charcoal sage-border-soft disabled:opacity-60"
+                  >
+                    {aiSaving ? <Loader2 size={12} className="animate-spin" /> : <BookmarkPlus size={12} color="#ca0013" />}
+                    Save to My Foods
+                  </button>
+                )}
+                <button
+                  onClick={() => setAiPreview(null)}
+                  className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-charcoal sage-border-soft"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {results.length === 0 && !aiPreview && (
+            <div className="py-8 text-center">
+              <p className="text-sm font-bold" style={{ color: "#b7c6c2" }}>No foods found</p>
+              {q.trim() && (
+                <button
+                  onClick={runAiAnalyze}
+                  disabled={aiLoading}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-extrabold text-white disabled:opacity-60"
+                  style={{ backgroundColor: "#ca0013" }}
+                >
+                  {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  Analyze with AI
+                </button>
+              )}
+            </div>
           )}
           {results.length === 30 && (
             <p className="py-4 text-center text-xs font-bold" style={{ color: "#b7c6c2" }}>

@@ -79,23 +79,53 @@ function GoalsPage() {
     setRemindersOn(getRemindersEnabled());
   }, []);
 
+  // Sync with persisted profile preference on load
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("profiles")
+      .select("notifications_enabled")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        setRemindersOn(!!data.notifications_enabled && getRemindersEnabled());
+      });
+  }, [user?.id]);
+
+  const persistReminderPref = async (enabled: boolean) => {
+    if (!user?.id) return;
+    await supabase.from("profiles").upsert({
+      id: user.id,
+      notifications_enabled: enabled,
+      notifications_prompt_completed: true,
+      notification_consent_date: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  };
+
   const toggleReminders = async () => {
     if (remindersOn) {
       disableReminders();
       setRemindersOn(false);
-      toast.success("Meal reminders turned off");
+      await persistReminderPref(false);
+      track("reminders_toggled", { enabled: false });
+      toast.success("✓ Meal reminders disabled");
     } else {
       setRequestingPerm(true);
       const granted = await requestAndEnableReminders();
       setRequestingPerm(false);
       if (granted) {
         setRemindersOn(true);
-        toast.success("Meal reminders enabled! You'll be reminded at 8am, 1pm, 4pm, and 7:30pm.");
+        await persistReminderPref(true);
+        track("reminders_toggled", { enabled: true });
+        toast.success("✓ Meal reminders enabled");
       } else {
         toast.error("Notification permission denied. Enable it in your browser/device settings.");
       }
     }
   };
+
 
 
   useEffect(() => {

@@ -35,9 +35,19 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd, onAdd
   const [meal, setMeal] = useState<MealType>(defaultMeal);
   const [savedIdxs, setSavedIdxs] = useState<Set<number>>(new Set());
   const recRef = useRef<any>(null);
+  const heardRef = useRef<HTMLTextAreaElement | null>(null);
   const parse = useServerFn(parseFoodText);
   const estimate = useServerFn(estimateFood);
   const { addCustomFood } = useCustomFoods(userId);
+
+  // Autofocus the editable Heard field when speech recognition ends with a transcript.
+  useEffect(() => {
+    if (!listening && transcript && heardRef.current) {
+      heardRef.current.focus();
+      heardRef.current.setSelectionRange(transcript.length, transcript.length);
+    }
+  }, [listening]);
+
 
   useEffect(() => {
     if (!open) return;
@@ -224,15 +234,22 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd, onAdd
 
             {(transcript || items.length > 0) && (
               <div className="mt-3 rounded-2xl bg-cream p-3">
-                <p className="text-label" style={{ color: "#b7c6c2" }}>Heard</p>
-                <p className="text-sm font-bold text-charcoal">{transcript || "—"}</p>
-                {!loading && !listening && transcript && items.length === 0 && (
+                <p className="text-label" style={{ color: "#b7c6c2" }}>Heard · tap to edit</p>
+                <textarea
+                  ref={heardRef}
+                  value={transcript}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  placeholder="e.g. 2 idlis and 1 vada"
+                  rows={2}
+                  className="mt-1 w-full resize-none rounded-xl bg-white px-3 py-2 text-sm font-bold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
+                />
+                {!loading && !listening && transcript.trim() && (
                   <button
                     onClick={() => analyze(transcript)}
-                    className="mt-2 flex items-center gap-1 text-xs font-extrabold"
+                    className="mt-2 flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold sage-border-soft"
                     style={{ color: "#ca0013" }}
                   >
-                    <Sparkles size={12} /> Analyze
+                    <Sparkles size={12} /> {items.length > 0 ? "Re-analyze" : "Analyze"}
                   </button>
                 )}
               </div>
