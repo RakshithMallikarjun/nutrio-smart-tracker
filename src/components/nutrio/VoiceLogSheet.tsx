@@ -236,12 +236,7 @@ export function VoiceLogSheet({ open, onClose, defaultMeal, userId, onAdd, onAdd
               <div className="mt-3 rounded-2xl bg-cream p-3">
                 <p className="text-label" style={{ color: "#b7c6c2" }}>Heard · tap to edit</p>
                 <textarea
-                  ref={(el) => {
-                    if (el && !listening && transcript && items.length === 0) {
-                      // Auto-focus once after recognition ends
-                      if (document.activeElement !== el) el.focus();
-                    }
-                  }}
+                  ref={heardRef}
                   value={transcript}
                   onChange={(e) => setTranscript(e.target.value)}
                   placeholder="e.g. 2 idlis and 1 vada"
