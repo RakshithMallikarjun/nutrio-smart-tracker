@@ -12,7 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { initAnalytics } from "@/lib/analytics";
-import { scheduleLocalReminders, getRemindersEnabled } from "@/lib/notifications";
+
 
 
 function NotFoundComponent() {
@@ -132,9 +132,8 @@ function RootComponent() {
         .register("/sw.js", { scope: "/" })
         .catch((err) => console.warn("SW registration failed:", err));
     }
-    if (getRemindersEnabled()) {
-      scheduleLocalReminders();
-    }
+
+
   }, []);
 
 

@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedWeeklyRouteImport } from './routes/_authenticated/weekly'
 import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as ApiPublicHooksSendRemindersRouteImport } from './routes/api/public/hooks/send-reminders'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -45,6 +46,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicHooksSendRemindersRoute =
+  ApiPublicHooksSendRemindersRouteImport.update({
+    id: '/api/public/hooks/send-reminders',
+    path: '/api/public/hooks/send-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -52,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/goals': typeof AuthenticatedGoalsRoute
   '/weekly': typeof AuthenticatedWeeklyRoute
+  '/api/public/hooks/send-reminders': typeof ApiPublicHooksSendRemindersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +67,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/goals': typeof AuthenticatedGoalsRoute
   '/weekly': typeof AuthenticatedWeeklyRoute
+  '/api/public/hooks/send-reminders': typeof ApiPublicHooksSendRemindersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +77,25 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/goals': typeof AuthenticatedGoalsRoute
   '/_authenticated/weekly': typeof AuthenticatedWeeklyRoute
+  '/api/public/hooks/send-reminders': typeof ApiPublicHooksSendRemindersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard' | '/goals' | '/weekly'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/goals'
+    | '/weekly'
+    | '/api/public/hooks/send-reminders'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/goals' | '/weekly'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/goals'
+    | '/weekly'
+    | '/api/public/hooks/send-reminders'
   id:
     | '__root__'
     | '/'
@@ -82,12 +104,14 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/goals'
     | '/_authenticated/weekly'
+    | '/api/public/hooks/send-reminders'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicHooksSendRemindersRoute: typeof ApiPublicHooksSendRemindersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -134,6 +158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/send-reminders': {
+      id: '/api/public/hooks/send-reminders'
+      path: '/api/public/hooks/send-reminders'
+      fullPath: '/api/public/hooks/send-reminders'
+      preLoaderRoute: typeof ApiPublicHooksSendRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -156,17 +187,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicHooksSendRemindersRoute: ApiPublicHooksSendRemindersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

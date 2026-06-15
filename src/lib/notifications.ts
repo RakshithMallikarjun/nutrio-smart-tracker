@@ -1,77 +1,17 @@
-// Meal reminder schedule: breakfast 8am, lunch 1pm, snack 4pm, dinner 7:30pm
-const REMINDERS = [
-  { hour: 8, minute: 0, title: "🥣 Breakfast time!", body: "Don't forget to log your breakfast in Nutrio." },
-  { hour: 13, minute: 0, title: "🥗 Lunch time!", body: "Log your lunch to stay on track with your goals." },
-  { hour: 16, minute: 0, title: "🍎 Snack check-in", body: "Had a snack? Tap to log it quickly." },
-  { hour: 19, minute: 30, title: "🍽️ Dinner time!", body: "Time to log your dinner and review your day." },
-];
+import { supabase } from "@/integrations/supabase/client";
+import { VAPID_PUBLIC_KEY, urlBase64ToUint8Array } from "@/lib/push-vapid";
+import {
+  savePushSubscription,
+  deletePushSubscription,
+} from "@/lib/push.functions";
 
 const LS_KEY = "nutrio:reminder-enabled";
-const ALARM_KEY = "nutrio:reminder-alarms";
 
 export function getRemindersEnabled(): boolean {
   if (typeof window === "undefined") return false;
   return localStorage.getItem(LS_KEY) === "true";
 }
 
-export async function requestAndEnableReminders(): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-  if (!("Notification" in window) || !("serviceWorker" in navigator)) return false;
-  const perm = await Notification.requestPermission();
-  if (perm !== "granted") return false;
-  localStorage.setItem(LS_KEY, "true");
-  scheduleLocalReminders();
-  return true;
-}
-
-export function disableReminders() {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(LS_KEY, "false");
-  const ids = JSON.parse(localStorage.getItem(ALARM_KEY) ?? "[]") as number[];
-  ids.forEach((id) => clearTimeout(id));
-  localStorage.removeItem(ALARM_KEY);
-}
-
-export function scheduleLocalReminders() {
-  if (typeof window === "undefined") return;
-  const old = JSON.parse(localStorage.getItem(ALARM_KEY) ?? "[]") as number[];
-  old.forEach((id) => clearTimeout(id));
-
-  const ids: number[] = [];
-  const now = new Date();
-
-  REMINDERS.forEach((r) => {
-    const next = new Date();
-    next.setHours(r.hour, r.minute, 0, 0);
-    if (next <= now) next.setDate(next.getDate() + 1);
-    const delay = next.getTime() - now.getTime();
-
-    const id = setTimeout(async () => {
-      if (!getRemindersEnabled()) return;
-      if (Notification.permission === "granted") {
-        const swReg = await navigator.serviceWorker.ready.catch(() => null);
-        if (swReg) {
-          swReg.showNotification(r.title, {
-            body: r.body,
-            icon: "/icon-192.png",
-            badge: "/icon-192.png",
-            tag: `nutrio-${r.hour}`,
-            data: { url: "/dashboard" },
-          } as NotificationOptions);
-        } else {
-          new Notification(r.title, { body: r.body, icon: "/icon-192.png" });
-        }
-      }
-      scheduleLocalReminders();
-    }, delay) as unknown as number;
-
-    ids.push(id);
-  });
-
-  localStorage.setItem(ALARM_KEY, JSON.stringify(ids));
-}
-
-// Future reminder helpers — used by upcoming meal/water reminder scheduling
 export function hasReminderConsent(): boolean {
   if (typeof window === "undefined") return false;
   return localStorage.getItem(LS_KEY) !== null;
@@ -83,3 +23,105 @@ export function canReceiveReminders(): boolean {
   return getRemindersEnabled() && Notification.permission === "granted";
 }
 
+async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
+  try {
+    // sw.js is registered in __root.tsx on mount
+    return await navigator.serviceWorker.ready;
+  } catch {
+    return null;
+  }
+}
+
+function getTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+/**
+ * Ask for notification permission, subscribe to web push, and persist the
+ * subscription on the server so the cron job can deliver reminders even when
+ * the app is closed.
+ */
+export async function requestAndEnableReminders(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    return false;
+  }
+
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return false;
+
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") return false;
+
+  const reg = await getRegistration();
+  if (!reg) return false;
+
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    try {
+      const key = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: key.buffer.slice(key.byteOffset, key.byteOffset + key.byteLength) as ArrayBuffer,
+      });
+    } catch (err) {
+      console.error("Push subscribe failed", err);
+      return false;
+    }
+  }
+
+  const json = sub.toJSON();
+  const p256dh = json.keys?.p256dh;
+  const auth = json.keys?.auth;
+  if (!sub.endpoint || !p256dh || !auth) return false;
+
+  try {
+    await savePushSubscription({
+      data: {
+        endpoint: sub.endpoint,
+        p256dh,
+        auth,
+        timezone: getTimezone(),
+      },
+    });
+  } catch (err) {
+    console.error("Save push subscription failed", err);
+    return false;
+  }
+
+  localStorage.setItem(LS_KEY, "true");
+  return true;
+}
+
+export async function disableReminders() {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LS_KEY, "false");
+  const reg = await getRegistration();
+  if (!reg) return;
+  const sub = await reg.pushManager.getSubscription();
+  if (!sub) return;
+  try {
+    await deletePushSubscription({ data: { endpoint: sub.endpoint } });
+  } catch (err) {
+    console.error("Delete push subscription failed", err);
+  }
+  try {
+    await sub.unsubscribe();
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Kept for backward compatibility with callers that referenced the old
+ * setTimeout-based scheduler. Reminders are now delivered via web push from
+ * the server, so this is a no-op.
+ */
+export function scheduleLocalReminders() {
+  /* intentionally empty — reminders are server-side via web push */
+}
