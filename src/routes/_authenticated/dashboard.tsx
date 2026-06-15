@@ -16,6 +16,7 @@ import { EditMealSheet } from "@/components/nutrio/EditMealSheet";
 import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
 import { Walkthrough } from "@/components/nutrio/Walkthrough";
 import { ReminderConsentModal } from "@/components/nutrio/ReminderConsentModal";
+import { MealReminderPopup } from "@/components/nutrio/MealReminderPopup";
 import type { MealRow } from "@/hooks/use-nutrio-cloud";
 import {
   Dialog,
@@ -115,6 +116,13 @@ function Dashboard() {
     <div className="mx-auto min-h-screen w-full max-w-md pb-32" style={{ backgroundColor: "#eeebe3" }}>
       <Walkthrough />
       <ReminderConsentModal userId={user?.id} />
+      <MealReminderPopup
+        loggedMealTypes={new Set(store.meals.map((m) => m.meal_type))}
+        onLogMeal={(meal) => {
+          setActiveMeal(meal);
+          setFoodOpen(true);
+        }}
+      />
 
       {/* Header */}
       <header className="flex items-center justify-between px-5 pt-12">
