@@ -191,45 +191,6 @@ export type Database = {
         }
         Relationships: []
       }
-      push_subscriptions: {
-        Row: {
-          auth: string
-          created_at: string
-          endpoint: string
-          id: string
-          last_sent_at: string | null
-          last_sent_slot: string | null
-          p256dh: string
-          timezone: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          auth: string
-          created_at?: string
-          endpoint: string
-          id?: string
-          last_sent_at?: string | null
-          last_sent_slot?: string | null
-          p256dh: string
-          timezone?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          auth?: string
-          created_at?: string
-          endpoint?: string
-          id?: string
-          last_sent_at?: string | null
-          last_sent_slot?: string | null
-          p256dh?: string
-          timezone?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       water_entries: {
         Row: {
           id: string
