@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode, Pencil, Loader2 } from "lucide-react";
+import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode, Pencil, Loader2, Copy, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
-import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
+import { useStreak } from "@/hooks/use-streak";
+import { useYesterdayMeals } from "@/hooks/use-yesterday-meals";
+import { MEAL_EMOJI, MEAL_LABELS, type MealType, type Food } from "@/lib/nutrio-data";
 import { Ring } from "@/components/nutrio/Ring";
 import { MacroBar } from "@/components/nutrio/MacroBar";
 import { BottomNav, type Tab } from "@/components/nutrio/BottomNav";
@@ -17,6 +19,9 @@ import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
 import { Walkthrough } from "@/components/nutrio/Walkthrough";
 import { ReminderConsentModal } from "@/components/nutrio/ReminderConsentModal";
 import { MealReminderPopup } from "@/components/nutrio/MealReminderPopup";
+import { StreakCard } from "@/components/nutrio/StreakCard";
+import { WeightSummaryCard } from "@/components/nutrio/WeightSummaryCard";
+import { CopyYesterdaySheet } from "@/components/nutrio/CopyYesterdaySheet";
 import type { MealRow } from "@/hooks/use-nutrio-cloud";
 import {
   Dialog,
@@ -28,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { identifyUser, track, resetUser } from "@/lib/analytics";
+import type { WeightUnit } from "@/hooks/use-weight-logs";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -65,8 +71,15 @@ function Dashboard() {
   const [bootLoading, setBootLoading] = useState(true);
   const [editEntry, setEditEntry] = useState<MealRow | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [copyMeal, setCopyMeal] = useState<MealType | null>(null);
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
 
-
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from("profiles").select("weight_unit").eq("id", user.id).maybeSingle().then(({ data }) => {
+      if (data?.weight_unit === "lb" || data?.weight_unit === "kg") setWeightUnit(data.weight_unit);
+    });
+  }, [user?.id]);
 
   useEffect(() => {
     const t = setTimeout(() => setBootLoading(false), 700);
@@ -97,6 +110,17 @@ function Dashboard() {
     return map;
   }, [store.meals]);
   const mealsForActive = mealMap.get(activeMeal) ?? [];
+  const loggedMealTypes = useMemo(() => new Set(store.meals.map((m) => m.meal_type)), [store.meals]);
+  const streak = useStreak({
+    userId: user?.id,
+    todayMealsByType: loggedMealTypes,
+    caloriesToday: store.totals.calories,
+    calorieGoal: store.goals.calories,
+    waterToday: store.waterTotal,
+    waterGoal: store.goals.water_ml,
+  });
+  const { yesterdayItems } = useYesterdayMeals(user?.id);
+  const yesterdayCountFor = (m: MealType) => yesterdayItems.filter((y) => y.meal === m).length;
 
   const confirmSignOut = async () => {
     resetUser();
@@ -123,6 +147,9 @@ function Dashboard() {
           setFoodOpen(true);
         }}
       />
+
+      <StreakCard streak={streak} />
+      <WeightSummaryCard userId={user?.id} unit={weightUnit} />
 
       {/* Header */}
       <header className="flex items-center justify-between px-5 pt-12">
@@ -205,6 +232,26 @@ function Dashboard() {
         </div>
         <ChevronRight color="#b7c6c2" className="shrink-0" />
       </button>
+
+      {/* Quick water adds — one-tap */}
+      <div className="mx-5 mt-2 grid grid-cols-4 gap-2">
+        {[250, 500, 750].map((ml) => (
+          <button
+            key={ml}
+            onClick={() => { store.addWater(ml); track("water_logged", { amount_ml: ml, source: "dashboard" }); toast.success(`+${ml} ml`); }}
+            className="flex items-center justify-center gap-1 rounded-full bg-white py-2 text-[11px] font-extrabold text-charcoal sage-border-soft active:scale-95"
+          >
+            <Plus size={11} color="#ca0013" />{ml}
+          </button>
+        ))}
+        <button
+          onClick={() => { setWaterOpen(true); track("water_opened", { source: "custom" }); }}
+          className="flex items-center justify-center rounded-full py-2 text-[11px] font-extrabold text-white"
+          style={{ backgroundColor: "#171e19" }}
+        >
+          Custom
+        </button>
+      </div>
 
       {/* Today's overview */}
       <section className="mx-5 mt-5">
