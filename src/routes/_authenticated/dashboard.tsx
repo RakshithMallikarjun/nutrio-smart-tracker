@@ -71,8 +71,15 @@ function Dashboard() {
   const [bootLoading, setBootLoading] = useState(true);
   const [editEntry, setEditEntry] = useState<MealRow | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [copyMeal, setCopyMeal] = useState<MealType | null>(null);
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
 
-
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from("profiles").select("weight_unit").eq("id", user.id).maybeSingle().then(({ data }) => {
+      if (data?.weight_unit === "lb" || data?.weight_unit === "kg") setWeightUnit(data.weight_unit);
+    });
+  }, [user?.id]);
 
   useEffect(() => {
     const t = setTimeout(() => setBootLoading(false), 700);
