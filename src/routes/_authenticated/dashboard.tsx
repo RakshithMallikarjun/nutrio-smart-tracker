@@ -110,6 +110,17 @@ function Dashboard() {
     return map;
   }, [store.meals]);
   const mealsForActive = mealMap.get(activeMeal) ?? [];
+  const loggedMealTypes = useMemo(() => new Set(store.meals.map((m) => m.meal_type)), [store.meals]);
+  const streak = useStreak({
+    userId: user?.id,
+    todayMealsByType: loggedMealTypes,
+    caloriesToday: store.totals.calories,
+    calorieGoal: store.goals.calories,
+    waterToday: store.waterTotal,
+    waterGoal: store.goals.water_ml,
+  });
+  const { yesterdayItems } = useYesterdayMeals(user?.id);
+  const yesterdayCountFor = (m: MealType) => yesterdayItems.filter((y) => y.meal === m).length;
 
   const confirmSignOut = async () => {
     resetUser();
@@ -136,6 +147,9 @@ function Dashboard() {
           setFoodOpen(true);
         }}
       />
+
+      <StreakCard streak={streak} />
+      <WeightSummaryCard userId={user?.id} unit={weightUnit} />
 
       {/* Header */}
       <header className="flex items-center justify-between px-5 pt-12">
@@ -218,6 +232,26 @@ function Dashboard() {
         </div>
         <ChevronRight color="#b7c6c2" className="shrink-0" />
       </button>
+
+      {/* Quick water adds — one-tap */}
+      <div className="mx-5 mt-2 grid grid-cols-4 gap-2">
+        {[250, 500, 750].map((ml) => (
+          <button
+            key={ml}
+            onClick={() => { store.addWater(ml); track("water_logged", { amount_ml: ml, source: "dashboard" }); toast.success(`+${ml} ml`); }}
+            className="flex items-center justify-center gap-1 rounded-full bg-white py-2 text-[11px] font-extrabold text-charcoal sage-border-soft active:scale-95"
+          >
+            <Plus size={11} color="#ca0013" />{ml}
+          </button>
+        ))}
+        <button
+          onClick={() => { setWaterOpen(true); track("water_opened", { source: "custom" }); }}
+          className="flex items-center justify-center rounded-full py-2 text-[11px] font-extrabold text-white"
+          style={{ backgroundColor: "#171e19" }}
+        >
+          Custom
+        </button>
+      </div>
 
       {/* Today's overview */}
       <section className="mx-5 mt-5">
