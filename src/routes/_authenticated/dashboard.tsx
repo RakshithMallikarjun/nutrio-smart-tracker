@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode, Pencil, Loader2 } from "lucide-react";
+import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode, Pencil, Loader2, Copy, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
-import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
+import { useStreak } from "@/hooks/use-streak";
+import { useYesterdayMeals } from "@/hooks/use-yesterday-meals";
+import { MEAL_EMOJI, MEAL_LABELS, type MealType, type Food } from "@/lib/nutrio-data";
 import { Ring } from "@/components/nutrio/Ring";
 import { MacroBar } from "@/components/nutrio/MacroBar";
 import { BottomNav, type Tab } from "@/components/nutrio/BottomNav";
@@ -17,6 +19,9 @@ import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
 import { Walkthrough } from "@/components/nutrio/Walkthrough";
 import { ReminderConsentModal } from "@/components/nutrio/ReminderConsentModal";
 import { MealReminderPopup } from "@/components/nutrio/MealReminderPopup";
+import { StreakCard } from "@/components/nutrio/StreakCard";
+import { WeightSummaryCard } from "@/components/nutrio/WeightSummaryCard";
+import { CopyYesterdaySheet } from "@/components/nutrio/CopyYesterdaySheet";
 import type { MealRow } from "@/hooks/use-nutrio-cloud";
 import {
   Dialog,
@@ -28,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { identifyUser, track, resetUser } from "@/lib/analytics";
+import type { WeightUnit } from "@/hooks/use-weight-logs";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
