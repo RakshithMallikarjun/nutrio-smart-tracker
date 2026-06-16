@@ -152,12 +152,14 @@ export type Database = {
           goal_type: string | null
           height_cm: number | null
           id: string
+          longest_streak: number
           name: string | null
           notification_consent_date: string | null
           notifications_enabled: boolean
           notifications_prompt_completed: boolean
           updated_at: string
           weight_kg: number | null
+          weight_unit: string
         }
         Insert: {
           activity_level?: string | null
@@ -167,12 +169,14 @@ export type Database = {
           goal_type?: string | null
           height_cm?: number | null
           id: string
+          longest_streak?: number
           name?: string | null
           notification_consent_date?: string | null
           notifications_enabled?: boolean
           notifications_prompt_completed?: boolean
           updated_at?: string
           weight_kg?: number | null
+          weight_unit?: string
         }
         Update: {
           activity_level?: string | null
@@ -182,12 +186,14 @@ export type Database = {
           goal_type?: string | null
           height_cm?: number | null
           id?: string
+          longest_streak?: number
           name?: string | null
           notification_consent_date?: string | null
           notifications_enabled?: boolean
           notifications_prompt_completed?: boolean
           updated_at?: string
           weight_kg?: number | null
+          weight_unit?: string
         }
         Relationships: []
       }
@@ -212,6 +218,36 @@ export type Database = {
           logged_at?: string
           quantity_ml?: number
           user_id?: string
+        }
+        Relationships: []
+      }
+      weight_logs: {
+        Row: {
+          created_at: string
+          id: string
+          log_date: string
+          note: string | null
+          updated_at: string
+          user_id: string
+          weight_kg: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          log_date?: string
+          note?: string | null
+          updated_at?: string
+          user_id: string
+          weight_kg: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          log_date?: string
+          note?: string | null
+          updated_at?: string
+          user_id?: string
+          weight_kg?: number
         }
         Relationships: []
       }
