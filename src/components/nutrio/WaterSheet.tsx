@@ -1,4 +1,5 @@
-import { X, Droplet, Undo2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Droplet, Undo2, Plus, PartyPopper } from "lucide-react";
 import { track } from "@/lib/analytics";
 
 type Props = {
@@ -13,14 +14,35 @@ type Props = {
 const QUICK = [250, 500, 750, 1000];
 
 export function WaterSheet({ open, onClose, total, goal, onAdd, onUndo }: Props) {
+  const [custom, setCustom] = useState("");
+  const [celebrated, setCelebrated] = useState(false);
+
+  useEffect(() => {
+    if (!open) setCelebrated(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (open && !celebrated && total >= goal && goal > 0) {
+      setCelebrated(true);
+      track("water_goal_reached", { total_ml: total });
+    }
+  }, [open, total, goal, celebrated]);
+
   if (!open) return null;
   const pct = Math.min(100, (total / goal) * 100);
+
+  const addCustom = () => {
+    const n = parseInt(custom, 10);
+    if (Number.isFinite(n) && n > 0) {
+      onAdd(n);
+      track("water_logged", { amount_ml: n, source: "custom" });
+      setCustom("");
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(23,30,25,0.4)" }} onClick={onClose}>
-      <div
-        className="animate-fade-in w-full max-w-md rounded-t-[2.5rem] bg-white p-6 pb-32"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="animate-fade-in w-full max-w-md rounded-t-[2.5rem] bg-white p-6 pb-32" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-black text-charcoal">Water Intake</h2>
           <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full sage-border" aria-label="Close">
@@ -37,6 +59,10 @@ export function WaterSheet({ open, onClose, total, goal, onAdd, onUndo }: Props)
               <p className="text-label opacity-70">Today</p>
               <p className="text-3xl font-black">{(total / 1000).toFixed(2)} L</p>
             </div>
+            <div className="ml-auto text-right">
+              <p className="text-label opacity-70">Complete</p>
+              <p className="text-2xl font-black">{Math.round(pct)}%</p>
+            </div>
           </div>
           <div className="mt-4 h-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
             <div className="h-2 rounded-full transition-[width] duration-500" style={{ width: `${pct}%`, backgroundColor: "#b7c6c2" }} />
@@ -44,14 +70,18 @@ export function WaterSheet({ open, onClose, total, goal, onAdd, onUndo }: Props)
           <p className="mt-2 text-xs font-bold opacity-70">Goal {(goal / 1000).toFixed(1)} L · {Math.max(0, goal - total)} ml left</p>
         </div>
 
+        {celebrated && (
+          <div className="animate-fade-in mb-4 flex items-center gap-2 rounded-2xl p-3" style={{ backgroundColor: "rgba(122,153,144,0.2)" }}>
+            <PartyPopper size={16} color="#7a9990" />
+            <p className="text-sm font-extrabold text-charcoal">Water goal achieved!</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           {QUICK.map((ml) => (
             <button
               key={ml}
-              onClick={() => {
-                onAdd(ml);
-                track("water_logged", { amount_ml: ml });
-              }}
+              onClick={() => { onAdd(ml); track("water_logged", { amount_ml: ml }); }}
               className="flex flex-col items-center gap-1 rounded-2xl bg-cream py-5 font-extrabold text-charcoal transition-transform hover:scale-[1.02] active:scale-95 sage-border-soft"
             >
               <Droplet size={20} color="#ca0013" />
@@ -60,10 +90,20 @@ export function WaterSheet({ open, onClose, total, goal, onAdd, onUndo }: Props)
           ))}
         </div>
 
-        <button
-          onClick={onUndo}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-white py-3 text-sm font-extrabold text-charcoal sage-border"
-        >
+        {/* Custom */}
+        <div className="mt-3 flex gap-2">
+          <input
+            type="number" inputMode="numeric" placeholder="Custom ml"
+            value={custom} onChange={(e) => setCustom(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addCustom()}
+            className="flex-1 rounded-2xl bg-cream px-4 py-3 text-sm font-extrabold text-charcoal outline-none sage-border-soft"
+          />
+          <button onClick={addCustom} disabled={!custom} className="flex items-center gap-1 rounded-2xl px-4 text-xs font-extrabold text-white disabled:opacity-50" style={{ backgroundColor: "#ca0013" }}>
+            <Plus size={14} /> Add
+          </button>
+        </div>
+
+        <button onClick={onUndo} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-white py-3 text-sm font-extrabold text-charcoal sage-border">
           <Undo2 size={16} /> Undo last
         </button>
       </div>

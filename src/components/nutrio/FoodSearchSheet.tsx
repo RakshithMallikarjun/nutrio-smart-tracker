@@ -1,15 +1,18 @@
 import { useMemo, useState, useEffect } from "react";
-import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus } from "lucide-react";
+import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus, Clock, Star, BookOpen, Folder } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { useDietPref } from "@/hooks/use-diet-pref";
 import { useCustomFoods } from "@/hooks/use-custom-foods";
+import { useRecentFoods } from "@/hooks/use-recent-foods";
 import { isAllowed, parseQty, scaleFood, type DietPref } from "@/lib/quantity";
 import { estimateFood } from "@/lib/ai-food.functions";
 import { track } from "@/lib/analytics";
 import { toast } from "sonner";
-
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 
 type Props = {
   open: boolean;
@@ -19,57 +22,83 @@ type Props = {
   userId?: string;
 };
 
+type TabKey = "recent" | "my" | "all";
+
 const DIET_LABELS: Record<DietPref, string> = {
-  any: "All",
-  veg: "Veg",
-  egg: "Eggetarian",
-  nonveg: "Non-veg",
-  vegan: "Vegan",
+  any: "All", veg: "Veg", egg: "Eggetarian", nonveg: "Non-veg", vegan: "Vegan",
 };
 
 export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: Props) {
   const [q, setQ] = useState("");
   const [meal, setMeal] = useState<MealType>(defaultMeal);
-  const [cat, setCat] = useState<string>("All");
+  const [tab, setTab] = useState<TabKey>("recent");
   const [foodDb, setFoodDb] = useState<Food[]>([]);
-  const [foodCategories, setFoodCategories] = useState<string[]>([]);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [diet, setDiet] = useDietPref();
   const { customFoods, deleteCustomFood, addCustomFood } = useCustomFoods(userId);
+  const { recent, frequent } = useRecentFoods(userId);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Food | null>(null);
 
   const estimateFn = useServerFn(estimateFood);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPreview, setAiPreview] = useState<Food | null>(null);
   const [aiSaving, setAiSaving] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    setMeal(defaultMeal);
+    setTab(recent.length > 0 ? "recent" : "all");
+    import("@/lib/nutrio-data").then(({ FOOD_DB }) => setFoodDb(FOOD_DB));
+  }, [open, defaultMeal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const term = q.trim().toLowerCase();
+  const { qtyFromQuery, searchTerm } = useMemo(() => {
+    if (!term) return { qtyFromQuery: 1, searchTerm: "" };
+    const { qty, rest } = parseQty(term);
+    return { qtyFromQuery: qty, searchTerm: rest.toLowerCase() };
+  }, [term]);
+
+  const filterBy = (list: Food[]) =>
+    list.filter((f) => {
+      if (!isAllowed((f.diet ?? "veg") as any, diet)) return false;
+      if (!searchTerm) return true;
+      return (
+        f.name.toLowerCase().includes(searchTerm) ||
+        (f.category ?? "").toLowerCase().includes(searchTerm)
+      );
+    });
+
+  const results = useMemo(() => {
+    if (tab === "recent") return filterBy(recent);
+    if (tab === "my") return filterBy(customFoods);
+    return filterBy(customFoods.concat(foodDb)).slice(0, 50);
+  }, [tab, recent, customFoods, foodDb, diet, searchTerm]);
+
+  useEffect(() => {
+    if (searchTerm.length < 2) return;
+    const t = setTimeout(() => track("food_searched", { term: searchTerm, tab }), 600);
+    return () => clearTimeout(t);
+  }, [searchTerm, tab]);
+
+  const getQty = (id: string) => qty[id] ?? qtyFromQuery;
+
   const runAiAnalyze = async () => {
-    const term = q.trim();
-    if (!term) {
-      toast.error("Type a food name first");
-      return;
-    }
+    const tt = q.trim();
+    if (!tt) { toast.error("Type a food name first"); return; }
     setAiLoading(true);
     setAiPreview(null);
     try {
-      const r = await estimateFn({ data: { name: term } });
+      const r = await estimateFn({ data: { name: tt } });
       setAiPreview({
-        id: `ai-${Date.now()}`,
-        name: r.name,
-        category: "AI Estimate",
-        serving: r.serving,
-        calories: r.calories,
-        protein: r.protein,
-        carbs: r.carbs,
-        fat: r.fat,
-        fiber: r.fiber,
+        id: `ai-${Date.now()}`, name: r.name, category: "AI Estimate",
+        serving: r.serving, calories: r.calories, protein: r.protein,
+        carbs: r.carbs, fat: r.fat, fiber: r.fiber,
       });
-      track("food_ai_analyzed", { term });
+      track("food_ai_analyzed", { term: tt });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not analyze");
-    } finally {
-      setAiLoading(false);
-    }
+    } finally { setAiLoading(false); }
   };
 
   const aiAddToLog = () => {
@@ -77,103 +106,45 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
     onAdd(aiPreview, meal);
     toast.success(`✓ Added to ${MEAL_LABELS[meal]}`);
     track("food_added", { food_name: aiPreview.name, category: "AI Estimate", meal, quantity: 1, calories: aiPreview.calories });
-    setAiPreview(null);
-    setQ("");
-    onClose();
+    setAiPreview(null); setQ(""); onClose();
   };
 
   const aiSaveToMyFoods = async () => {
     if (!aiPreview || !userId) return;
     const dup = customFoods.find((f) => f.name.trim().toLowerCase() === aiPreview.name.trim().toLowerCase());
-    if (dup) {
-      toast.info("Already saved in My Foods");
-      return;
-    }
+    if (dup) { toast.info("Already saved in My Foods"); return; }
     setAiSaving(true);
     try {
       await addCustomFood({
-        name: aiPreview.name,
-        category: "My Foods",
-        serving: aiPreview.serving,
-        calories: aiPreview.calories,
-        protein: aiPreview.protein,
-        carbs: aiPreview.carbs,
-        fat: aiPreview.fat,
-        fiber: aiPreview.fiber,
+        name: aiPreview.name, category: "My Foods", serving: aiPreview.serving,
+        calories: aiPreview.calories, protein: aiPreview.protein, carbs: aiPreview.carbs,
+        fat: aiPreview.fat, fiber: aiPreview.fiber,
       });
       toast.success("✓ Saved to My Foods");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save");
-    } finally {
-      setAiSaving(false);
-    }
+    } finally { setAiSaving(false); }
   };
 
-  const handleDelete = async (food: Food) => {
-    if (!food.id || deletingId) return;
-    setDeletingId(food.id);
+  const doDelete = async () => {
+    if (!confirmDelete?.id) return;
+    setDeletingId(confirmDelete.id);
     try {
-      await deleteCustomFood(food.id);
-      toast.success(`"${food.name}" removed from My Foods`);
-      if (cat === "My Foods" && results.length <= 1) setCat("All");
+      await deleteCustomFood(confirmDelete.id);
+      toast.success(`"${confirmDelete.name}" removed`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not delete");
-    } finally {
-      setDeletingId(null);
-    }
+    } finally { setDeletingId(null); setConfirmDelete(null); }
   };
 
-
-
-  useEffect(() => {
-    if (!open) return;
-    setMeal(defaultMeal);
-    import("@/lib/nutrio-data").then(({ FOOD_DB, FOOD_CATEGORIES }) => {
-      setFoodDb(FOOD_DB);
-      setFoodCategories(FOOD_CATEGORIES);
-    });
-  }, [open, defaultMeal]);
-
-  // Merged index: custom foods first so they win on duplicate names.
-  const merged = useMemo<Food[]>(() => [...customFoods, ...foodDb], [customFoods, foodDb]);
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    if (customFoods.length) set.add("My Foods");
-    foodCategories.forEach((c) => set.add(c));
-    return Array.from(set);
-  }, [customFoods, foodCategories]);
-
-  const { qtyFromQuery, term } = useMemo(() => {
-    const trimmed = q.trim();
-    if (!trimmed) return { qtyFromQuery: 1, term: "" };
-    const { qty, rest } = parseQty(trimmed);
-    return { qtyFromQuery: qty, term: rest.toLowerCase() };
-  }, [q]);
-
-  const results = useMemo(() => {
-    return merged.filter((f) => {
-      if (cat !== "All" && f.category !== cat) return false;
-      if (!isAllowed((f.diet ?? "veg") as any, diet)) return false;
-      if (term && !f.name.toLowerCase().includes(term) && !f.category.toLowerCase().includes(term)) return false;
-      return true;
-    }).slice(0, 30);
-  }, [term, cat, merged, diet]);
-
-  useEffect(() => {
-    if (term.length < 2) return;
-    const t = setTimeout(() => track("food_searched", { term, category: cat }), 600);
-    return () => clearTimeout(t);
-  }, [term, cat]);
-
-  const getQty = (id: string) => qty[id] ?? qtyFromQuery;
-
   if (!open) return null;
-
   const meals = Object.keys(MEAL_LABELS) as MealType[];
+
+  const showFrequentStrip = tab === "recent" && !searchTerm && frequent.length > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(23,30,25,0.4)" }} onClick={onClose}>
-      <div className="animate-fade-in flex h-[88vh] w-full max-w-md flex-col rounded-t-[2.5rem] bg-white p-6 pb-32" onClick={(e) => e.stopPropagation()}>
+      <div className="animate-fade-in flex h-[90vh] w-full max-w-md flex-col rounded-t-[2.5rem] bg-white p-6 pb-32" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-black text-charcoal">Add Food</h2>
           <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full sage-border" aria-label="Close">
@@ -181,172 +152,144 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
           </button>
         </div>
 
-        {/* Compact meal selector — active expands, others 40px emoji-only */}
+        {/* Meal selector */}
         <div className="mb-3 flex gap-2">
           {meals.map((m) => {
             const active = m === meal;
-            if (active) {
-              return (
-                <button
-                  key={m}
-                  onClick={() => setMeal(m)}
-                  className="flex h-10 flex-1 items-center justify-center gap-2 rounded-full px-3 text-sm font-extrabold"
-                  style={{ backgroundColor: "#171e19", color: "#ffffff" }}
-                >
-                  <span>{MEAL_EMOJI[m]}</span>
-                  <span className="truncate">{MEAL_LABELS[m]}</span>
-                </button>
-              );
-            }
-            return (
-              <button
-                key={m}
-                onClick={() => setMeal(m)}
-                aria-label={MEAL_LABELS[m]}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
-                style={{ backgroundColor: "#ffffff", border: "1px solid rgba(183,198,194,0.5)" }}
-              >
+            return active ? (
+              <button key={m} onClick={() => setMeal(m)} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-full px-3 text-sm font-extrabold" style={{ backgroundColor: "#171e19", color: "#ffffff" }}>
+                <span>{MEAL_EMOJI[m]}</span><span className="truncate">{MEAL_LABELS[m]}</span>
+              </button>
+            ) : (
+              <button key={m} onClick={() => setMeal(m)} aria-label={MEAL_LABELS[m]} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base" style={{ backgroundColor: "#ffffff", border: "1px solid rgba(183,198,194,0.5)" }}>
                 {MEAL_EMOJI[m]}
               </button>
             );
           })}
         </div>
 
-        {/* Diet pref */}
-        <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
-          {(Object.keys(DIET_LABELS) as DietPref[]).map((d) => {
-            const active = d === diet;
+        {/* Tabs: Recent | My Foods | All Foods */}
+        <div className="mb-3 grid grid-cols-3 gap-1 rounded-full bg-cream p-1 sage-border-soft">
+          {([
+            { k: "recent" as const, label: "Recent", Icon: Clock },
+            { k: "my" as const, label: "My Foods", Icon: Folder },
+            { k: "all" as const, label: "All Foods", Icon: BookOpen },
+          ]).map(({ k, label, Icon }) => {
+            const active = k === tab;
             return (
-              <button
-                key={d}
-                onClick={() => setDiet(d)}
-                className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider transition-colors"
-                style={{
-                  backgroundColor: active ? "#7a9990" : "#ffffff",
-                  color: active ? "#ffffff" : "#171e19",
-                  border: active ? "none" : "1px solid rgba(183,198,194,0.5)",
-                }}
-              >
-                {DIET_LABELS[d]}
+              <button key={k} onClick={() => setTab(k)} className="flex items-center justify-center gap-1 rounded-full py-2 text-[11px] font-extrabold" style={{ backgroundColor: active ? "#171e19" : "transparent", color: active ? "#fff" : "#171e19" }}>
+                <Icon size={12} /> {label}
               </button>
             );
           })}
         </div>
 
-        {/* Search input with clear + mic */}
+        {/* Search input */}
         <div className="relative mb-3">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2" color="#b7c6c2" />
           <input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder='Try "2 idlis" or "pizza"'
-            className="w-full rounded-2xl bg-cream py-3 pl-11 pr-28 text-base font-semibold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
+            value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder='Search name or brand…'
+            className="w-full rounded-2xl bg-cream py-3 pl-11 pr-24 text-base font-semibold text-charcoal outline-none sage-border-soft focus:ring-2 focus:ring-charcoal/20"
           />
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
             {q && (
-              <button
-                onClick={() => setQ("")}
-                aria-label="Clear search"
-                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white"
-              >
+              <button onClick={() => setQ("")} aria-label="Clear" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white">
                 <X size={14} color="#b7c6c2" />
               </button>
             )}
-            <button
-              onClick={runAiAnalyze}
-              disabled={aiLoading || !q.trim()}
-              aria-label="Analyze with AI"
-              className="flex h-8 items-center gap-1 rounded-full px-3 text-[11px] font-extrabold text-white disabled:opacity-50"
-              style={{ backgroundColor: "#ca0013" }}
-            >
-              {aiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              AI
+            <button onClick={runAiAnalyze} disabled={aiLoading || !q.trim()} aria-label="Analyze with AI" className="flex h-8 items-center gap-1 rounded-full px-3 text-[11px] font-extrabold text-white disabled:opacity-50" style={{ backgroundColor: "#ca0013" }}>
+              {aiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} AI
             </button>
           </div>
         </div>
 
+        {/* Diet preference (only on All Foods) */}
+        {tab === "all" && (
+          <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
+            {(Object.keys(DIET_LABELS) as DietPref[]).map((d) => {
+              const active = d === diet;
+              return (
+                <button key={d} onClick={() => setDiet(d)} className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider" style={{ backgroundColor: active ? "#7a9990" : "#ffffff", color: active ? "#fff" : "#171e19", border: active ? "none" : "1px solid rgba(183,198,194,0.5)" }}>
+                  {DIET_LABELS[d]}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Category chips */}
-        <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
-          {["All", ...categories].map((c) => {
-            const active = c === cat;
-            return (
-              <button
-                key={c}
-                onClick={() => setCat(c)}
-                className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider transition-colors"
-                style={{
-                  backgroundColor: active ? "#ca0013" : "#ffffff",
-                  color: active ? "#ffffff" : "#171e19",
-                  border: active ? "none" : "1px solid rgba(183,198,194,0.5)",
-                }}
-              >
-                {c}
-              </button>
-            );
-          })}
-        </div>
+        {/* Frequent strip */}
+        {showFrequentStrip && (
+          <div className="mb-3">
+            <div className="mb-1.5 flex items-center gap-1">
+              <Star size={11} color="#ca0013" />
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#b7c6c2" }}>Frequent</p>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {frequent.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => { onAdd(f, meal); toast.success(`✓ Added`); track("food_added", { food_name: f.name, category: "Frequent", meal, quantity: 1, calories: f.calories }); onClose(); }}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full bg-cream px-3 py-2 text-xs font-extrabold text-charcoal sage-border-soft"
+                >
+                  <Plus size={12} color="#ca0013" /> {f.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Results */}
         <div className="flex-1 space-y-2 overflow-y-auto">
           {results.map((f) => {
             const n = getQty(f.id);
             const set = (v: number) => setQty({ ...qty, [f.id]: Math.max(0.5, Math.round(v * 2) / 2) });
+            const isMyFood = tab === "my" || f.category === "My Foods";
             return (
-              <div key={f.id} className="group relative flex items-center gap-2 rounded-2xl bg-white p-3 sage-border">
-                {f.category === "My Foods" && (
+              <div key={f.id} className="flex flex-col gap-2 rounded-2xl bg-white p-3 sage-border">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-extrabold text-charcoal">{f.name}</p>
+                    <p className="truncate text-[10px] font-bold uppercase tracking-wider" style={{ color: "#ca0013" }}>{f.category}</p>
+                    <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>
+                      {f.serving} · {Math.round(f.calories * n)} kcal · P{Math.round(f.protein * n)} C{Math.round(f.carbs * n)} F{Math.round(f.fat * n)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button onClick={() => set(n - 0.5)} className="flex h-7 w-7 items-center justify-center rounded-full sage-border-soft" aria-label="Decrease"><Minus size={12} /></button>
+                    <span className="w-6 text-center text-xs font-black text-charcoal">{n}×</span>
+                    <button onClick={() => set(n + 0.5)} className="flex h-7 w-7 items-center justify-center rounded-full sage-border-soft" aria-label="Increase"><Plus size={12} /></button>
+                  </div>
+                </div>
+                <div className="flex gap-2">
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(f); }}
-                    disabled={deletingId === f.id}
-                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
-                    style={{ backgroundColor: "rgba(202,0,19,0.1)" }}
-                    aria-label={`Delete ${f.name}`}
+                    onClick={() => {
+                      const scaled = scaleFood(f, n);
+                      onAdd(scaled, meal);
+                      track("food_added", { food_name: f.name, category: f.category, meal, quantity: n, calories: Math.round(f.calories * n) });
+                      onClose();
+                    }}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-xs font-extrabold text-white transition-colors"
+                    style={{ backgroundColor: "#ca0013" }}
                   >
-                    {deletingId === f.id
-                      ? <Loader2 size={12} className="animate-spin" color="#ca0013" />
-                      : <Trash2 size={12} color="#ca0013" />}
+                    <Plus size={14} /> Add
                   </button>
-                )}
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-extrabold text-charcoal">{f.name}</p>
-                  <p className="truncate text-[10px] font-bold uppercase tracking-wider" style={{ color: "#ca0013" }}>{f.category}</p>
-                  <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>
-                    {f.serving} · {Math.round(f.calories * n)} kcal · P{Math.round(f.protein * n)} C{Math.round(f.carbs * n)} F{Math.round(f.fat * n)}
-                  </p>
+                  {isMyFood && f.id && (
+                    <button
+                      onClick={() => setConfirmDelete(f)}
+                      disabled={deletingId === f.id}
+                      className="flex items-center justify-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-extrabold disabled:opacity-50"
+                      style={{ border: "1.5px solid #ca0013", color: "#ca0013" }}
+                      aria-label={`Delete ${f.name}`}
+                    >
+                      {deletingId === f.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Delete
+                    </button>
+                  )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button onClick={() => set(n - 0.5)} className="flex h-7 w-7 items-center justify-center rounded-full sage-border-soft" aria-label="Decrease">
-                    <Minus size={12} />
-                  </button>
-                  <span className="w-6 text-center text-xs font-black text-charcoal">{n}×</span>
-                  <button onClick={() => set(n + 0.5)} className="flex h-7 w-7 items-center justify-center rounded-full sage-border-soft" aria-label="Increase">
-                    <Plus size={12} />
-                  </button>
-                </div>
-                <button
-                  onClick={() => {
-                    const scaled = scaleFood(f, n);
-                    onAdd(scaled, meal);
-                    track("food_added", {
-                      food_name: f.name,
-                      category: f.category,
-                      meal,
-                      quantity: n,
-                      calories: Math.round(f.calories * n),
-                    });
-                    onClose();
-                  }}
-                  className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-vibrant hover:text-white"
-                  style={{ border: "1px solid rgba(183,198,194,0.5)" }}
-                  aria-label={`Add ${f.name}`}
-                >
-                  <Plus size={18} />
-                </button>
               </div>
             );
           })}
+
           {aiPreview && (
             <div className="rounded-2xl p-4 sage-border" style={{ backgroundColor: "#fffdf6" }}>
               <div className="mb-2 flex items-center gap-1.5">
@@ -358,55 +301,48 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
                 {aiPreview.serving} · {aiPreview.calories} kcal · P{aiPreview.protein} C{aiPreview.carbs} F{aiPreview.fat}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={aiAddToLog}
-                  className="flex items-center gap-1 rounded-full px-4 py-2 text-xs font-extrabold text-white"
-                  style={{ backgroundColor: "#ca0013" }}
-                >
+                <button onClick={aiAddToLog} className="flex items-center gap-1 rounded-full px-4 py-2 text-xs font-extrabold text-white" style={{ backgroundColor: "#ca0013" }}>
                   <Plus size={12} /> Add to Log
                 </button>
                 {userId && (
-                  <button
-                    onClick={aiSaveToMyFoods}
-                    disabled={aiSaving}
-                    className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-charcoal sage-border-soft disabled:opacity-60"
-                  >
-                    {aiSaving ? <Loader2 size={12} className="animate-spin" /> : <BookmarkPlus size={12} color="#ca0013" />}
-                    Save to My Foods
+                  <button onClick={aiSaveToMyFoods} disabled={aiSaving} className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-charcoal sage-border-soft disabled:opacity-60">
+                    {aiSaving ? <Loader2 size={12} className="animate-spin" /> : <BookmarkPlus size={12} color="#ca0013" />} Save to My Foods
                   </button>
                 )}
-                <button
-                  onClick={() => setAiPreview(null)}
-                  className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-charcoal sage-border-soft"
-                >
-                  Cancel
-                </button>
+                <button onClick={() => setAiPreview(null)} className="flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-charcoal sage-border-soft">Cancel</button>
               </div>
             </div>
           )}
+
           {results.length === 0 && !aiPreview && (
             <div className="py-8 text-center">
-              <p className="text-sm font-bold" style={{ color: "#b7c6c2" }}>No foods found</p>
+              <p className="text-sm font-bold" style={{ color: "#b7c6c2" }}>
+                {tab === "recent" ? "No recent foods yet — log a meal to populate this list."
+                 : tab === "my" ? "You haven't saved any foods yet."
+                 : "No foods found"}
+              </p>
               {q.trim() && (
-                <button
-                  onClick={runAiAnalyze}
-                  disabled={aiLoading}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-extrabold text-white disabled:opacity-60"
-                  style={{ backgroundColor: "#ca0013" }}
-                >
-                  {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  Analyze with AI
+                <button onClick={runAiAnalyze} disabled={aiLoading} className="mt-3 inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-extrabold text-white disabled:opacity-60" style={{ backgroundColor: "#ca0013" }}>
+                  {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Analyze with AI
                 </button>
               )}
             </div>
           )}
-          {results.length === 30 && (
-            <p className="py-4 text-center text-xs font-bold" style={{ color: "#b7c6c2" }}>
-              Showing top 30 — refine your search.
-            </p>
-          )}
         </div>
       </div>
+
+      <Dialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <DialogContent className="sm:max-w-sm" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Delete this food?</DialogTitle>
+            <DialogDescription>"{confirmDelete?.name}" will be removed from My Foods.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <button onClick={() => setConfirmDelete(null)} className="rounded-full bg-white px-4 py-2 text-xs font-extrabold text-charcoal sage-border">Cancel</button>
+            <button onClick={doDelete} className="rounded-full px-4 py-2 text-xs font-extrabold text-white" style={{ backgroundColor: "#ca0013" }}>Delete</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
