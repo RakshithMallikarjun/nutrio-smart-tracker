@@ -301,7 +301,18 @@ function Dashboard() {
             {MEAL_LABELS[activeMeal]}
             <span className="ml-1.5 text-sm" style={{ color: "#b7c6c2" }}>· {mealsForActive.length}</span>
           </h2>
-          <button onClick={() => { setFoodOpen(true); track("add_food_opened", { source: "meal_header", meal: activeMeal }); }} className="text-label" style={{ color: "#ca0013" }}>+ Add</button>
+          <div className="flex items-center gap-2">
+            {yesterdayCountFor(activeMeal) > 0 && (
+              <button
+                onClick={() => { setCopyMeal(activeMeal); track("copy_yesterday_opened", { meal: activeMeal }); }}
+                className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-extrabold text-charcoal sage-border-soft"
+                aria-label="Copy from yesterday"
+              >
+                <Copy size={11} color="#ca0013" /> Copy yesterday
+              </button>
+            )}
+            <button onClick={() => { setFoodOpen(true); track("add_food_opened", { source: "meal_header", meal: activeMeal }); }} className="text-label" style={{ color: "#ca0013" }}>+ Add</button>
+          </div>
         </div>
 
         {mealsForActive.length === 0 ? (
@@ -433,6 +444,24 @@ function Dashboard() {
           toast.success("Entry updated");
         }}
       />
+
+      <CopyYesterdaySheet
+        open={copyMeal !== null}
+        onClose={() => setCopyMeal(null)}
+        meal={copyMeal ?? activeMeal}
+        userId={user?.id}
+        onCopy={async (items) => {
+          if (items.length === 0) return;
+          setSyncing(true);
+          try {
+            await store.addFoods(items.map((i) => ({ food: i.food, mealType: i.meal })));
+          } finally {
+            setTimeout(() => setSyncing(false), 1200);
+          }
+        }}
+      />
+
+
 
 
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
