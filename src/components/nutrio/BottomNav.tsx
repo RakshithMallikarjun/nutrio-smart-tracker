@@ -1,6 +1,6 @@
-import { Home, TrendingUp, Plus, Droplet, User } from "lucide-react";
+import { Home, BookOpen, Plus, BarChart3, User } from "lucide-react";
 
-type Tab = "home" | "trends" | "water" | "profile";
+type Tab = "home" | "diary" | "trends" | "profile";
 
 type Props = {
   active: Tab;
@@ -15,44 +15,40 @@ export function BottomNav({ active, onChange, onAdd }: Props) {
       <button
         key={key}
         onClick={() => onChange(key)}
-        className="flex h-12 w-12 items-center justify-center rounded-full transition-colors"
+        className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1"
         aria-label={label}
       >
-        <Icon size={22} style={{ color: isActive ? "#ffffff" : "#b7c6c2" }} strokeWidth={isActive ? 2.5 : 2} />
+        <Icon size={20} style={{ color: isActive ? "#ffffff" : "#6b6b6b" }} strokeWidth={isActive ? 2.5 : 2} />
+        <span className="text-[10px] font-bold" style={{ color: isActive ? "#ffffff" : "#6b6b6b" }}>{label}</span>
       </button>
     );
   };
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-2 z-40 flex justify-center px-2">
+    <div className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex justify-center px-3">
       <div
-        className="pointer-events-auto relative flex h-16 w-full max-w-md items-center justify-between rounded-full px-4"
-        style={{ backgroundColor: "#171e19" }}
+        className="pointer-events-auto relative flex h-16 w-full max-w-md items-center rounded-2xl px-2"
+        style={{ backgroundColor: "#1a1a1a" }}
       >
-        <div className="flex flex-1 justify-around">
-          {item("home", Home, "Home")}
-          {item("trends", TrendingUp, "Trends")}
+        {item("home", Home, "Home")}
+        {item("diary", BookOpen, "Diary")}
+
+        <div className="flex w-16 shrink-0 items-center justify-center">
+          <button
+            onClick={onAdd}
+            aria-label="Add food"
+            className="flex h-14 w-14 items-center justify-center rounded-full transition-transform active:scale-95"
+            style={{
+              backgroundColor: "#e03030",
+              boxShadow: "0 10px 24px -8px rgba(224,48,48,0.55)",
+            }}
+          >
+            <Plus size={26} color="#ffffff" strokeWidth={3} />
+          </button>
         </div>
 
-        {/* Floating FAB */}
-        <button
-          onClick={onAdd}
-          aria-label="Add food"
-          className="absolute left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95"
-          style={{
-            top: -28,
-            backgroundColor: "#ca0013",
-            border: "4px solid #eeebe3",
-            boxShadow: "0 12px 30px -8px rgba(202,0,19,0.45)",
-          }}
-        >
-          <Plus size={26} color="#ffffff" strokeWidth={3} />
-        </button>
-
-        <div className="flex flex-1 justify-around">
-          {item("water", Droplet, "Water")}
-          {item("profile", User, "Profile")}
-        </div>
+        {item("trends", BarChart3, "Reports")}
+        {item("profile", User, "Profile")}
       </div>
     </div>
   );
