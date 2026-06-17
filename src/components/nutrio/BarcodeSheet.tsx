@@ -352,3 +352,13 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
     </div>
   );
 }
+
+function CornerBracket({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
+  const base = "absolute h-5 w-5 border-white";
+  const cls =
+    pos === "tl" ? "top-0 left-0 border-t-2 border-l-2 rounded-tl-md"
+    : pos === "tr" ? "top-0 right-0 border-t-2 border-r-2 rounded-tr-md"
+    : pos === "bl" ? "bottom-0 left-0 border-b-2 border-l-2 rounded-bl-md"
+    : "bottom-0 right-0 border-b-2 border-r-2 rounded-br-md";
+  return <div className={`${base} ${cls}`} />;
+}
