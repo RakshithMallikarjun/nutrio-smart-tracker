@@ -36,7 +36,7 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
   const [qty, setQty] = useState<Record<string, number>>({});
   const [diet, setDiet] = useDietPref();
   const { customFoods, deleteCustomFood, addCustomFood } = useCustomFoods(userId);
-  const { recent, frequent } = useRecentFoods(userId);
+  const { recent } = useRecentFoods(userId);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Food | null>(null);
 
