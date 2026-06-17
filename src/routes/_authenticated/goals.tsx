@@ -252,6 +252,27 @@ function GoalsPage() {
           </div>
         </div>
 
+        <div>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#b7c6c2" }}>Weight unit</p>
+          <div className="grid grid-cols-2 gap-1">
+            {(["kg", "lb"] as const).map((u) => (
+              <button
+                key={u}
+                onClick={() => { setWeightUnit(u); track("weight_unit_changed", { unit: u }); }}
+                className="rounded-lg py-2 text-xs font-extrabold uppercase"
+                style={{
+                  backgroundColor: weightUnit === u ? "#171e19" : "#fffdf6",
+                  color: weightUnit === u ? "#fff" : "#171e19",
+                  border: weightUnit === u ? "none" : "1px solid rgba(183,198,194,0.5)",
+                }}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
+
+
         <div className="flex items-center justify-between rounded-xl bg-cream p-3">
           <div className="text-xs font-bold text-charcoal">
             <p className="text-[10px] uppercase tracking-wider" style={{ color: "#b7c6c2" }}>Suggested</p>
