@@ -544,32 +544,28 @@ function Dashboard() {
         }}
       />
 
-      <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Sign out?</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to log out?</AlertDialogTitle>
+            <AlertDialogDescription>
               You'll need to sign back in to access your logs.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <button
-              onClick={() => setSignOutOpen(false)}
-              className="flex-1 rounded-full bg-cream py-2.5 text-sm font-extrabold"
-              style={{ color: DARK, border: CARD_BORDER }}
-            >
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="flex-1 rounded-full py-2.5 text-sm font-extrabold">
               Cancel
-            </button>
-            <button
+            </AlertDialogCancel>
+            <AlertDialogAction
               onClick={confirmSignOut}
               className="flex-1 rounded-full py-2.5 text-sm font-extrabold text-white"
               style={{ backgroundColor: RED }}
             >
-              <LogOut size={14} className="mr-1 inline" /> Sign Out
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <LogOut size={14} className="mr-1 inline" /> Log out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
