@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Mic, Camera, ScanBarcode, Copy, Plus, LogOut, Loader2, Pencil, Trash2, Droplet } from "lucide-react";
+import { Flame, Mic, Camera, ScanBarcode, Copy, Plus, LogOut, Loader2, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { useStreak } from "@/hooks/use-streak";
@@ -20,15 +20,23 @@ import { Walkthrough } from "@/components/nutrio/Walkthrough";
 import { ReminderConsentModal } from "@/components/nutrio/ReminderConsentModal";
 import { MealReminderPopup } from "@/components/nutrio/MealReminderPopup";
 import { CopyYesterdaySheet } from "@/components/nutrio/CopyYesterdaySheet";
+import { ProfileMenu } from "@/components/nutrio/ProfileMenu";
+import { MealsSummaryModal } from "@/components/nutrio/MealsSummaryModal";
+import { ConsistencyTile } from "@/components/nutrio/ConsistencyTile";
+import { WaterTile } from "@/components/nutrio/WaterTile";
+import { WeightTile } from "@/components/nutrio/WeightTile";
+import { QuickLogPanel } from "@/components/nutrio/QuickLogPanel";
 import type { MealRow } from "@/hooks/use-nutrio-cloud";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { identifyUser, track, resetUser } from "@/lib/analytics";
 
@@ -84,6 +92,8 @@ function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const [copyMeal, setCopyMeal] = useState<MealType | null>(null);
   const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const { logs: weightLogs } = useWeightLogs(user?.id);
 
   useEffect(() => {
@@ -203,14 +213,12 @@ function Dashboard() {
             <Flame size={14} color="#d97706" fill="#f59e0b" />
             <span className="text-xs font-extrabold" style={{ color: "#92400e" }}>{streak.currentStreak} {streak.currentStreak === 1 ? "day" : "days"}</span>
           </div>
-          <button
-            onClick={() => setSignOutOpen(true)}
-            aria-label="Profile / Sign out"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
-            style={{ backgroundColor: DARK }}
-          >
-            {store.displayName.charAt(0).toUpperCase()}
-          </button>
+          <ProfileMenu
+            initial={store.displayName.charAt(0).toUpperCase()}
+            onViewProfile={() => navigate({ to: "/goals" })}
+            onSettings={() => navigate({ to: "/goals" })}
+            onSignOut={() => setSignOutOpen(true)}
+          />
         </div>
       </header>
 
@@ -282,7 +290,7 @@ function Dashboard() {
         <div className="mb-2.5 flex items-center justify-between">
           <h2 className="text-[15px] font-black" style={{ color: DARK }}>Today's meals</h2>
           <button
-            onClick={() => { setFoodOpen(true); track("add_food_opened", { source: "view_all" }); }}
+            onClick={() => { setSummaryOpen(true); track("meals_summary_opened"); }}
             className="text-xs font-bold"
             style={{ color: RED }}
           >
@@ -375,35 +383,35 @@ function Dashboard() {
 
       {/* 5. Stats strip */}
       <section className="mx-5 mt-4 grid grid-cols-3 gap-2">
-        <StatTile
-          label="Water"
-          value={`${(store.waterTotal / 1000).toFixed(1)}L`}
-          sub={`of ${(store.goals.water_ml / 1000).toFixed(1)}L`}
-          pct={Math.min(100, (store.waterTotal / Math.max(1, store.goals.water_ml)) * 100)}
-          color="#3b82f6"
-          icon={<Droplet size={12} color="#3b82f6" />}
-          onClick={() => { setWaterOpen(true); track("water_opened", { source: "stat_tile" }); }}
+        <WaterTile
+          total={store.waterTotal}
+          goal={store.goals.water_ml}
+          onAdd={(ml) => { store.addWater(ml); track("water_logged", { ml, source: "tile" }); }}
+          onOpen={() => { setWaterOpen(true); track("water_opened", { source: "stat_tile" }); }}
         />
-        <StatTile
-          label="Consistency"
-          value={`${streak.consistencyScore}%`}
-          sub="today"
-          pct={streak.consistencyScore}
-          color="#22a06b"
+        <ConsistencyTile
+          breakfast={loggedMealTypes.has("breakfast")}
+          lunch={loggedMealTypes.has("lunch")}
+          dinner={loggedMealTypes.has("dinner")}
+          water={store.goals.water_ml > 0 && store.waterTotal >= store.goals.water_ml}
+          calories={
+            store.goals.calories > 0 &&
+            store.totals.calories >= store.goals.calories * 0.8 &&
+            store.totals.calories <= store.goals.calories * 1.1
+          }
         />
-        <StatTile
-          label="Weight"
-          value={
+        <WeightTile
+          weightLabel={
             latestWeight !== null
-              ? `${displayWeight(latestWeight, weightUnit).toFixed(1)}${weightUnit}`
+              ? `${displayWeight(latestWeight, weightUnit).toFixed(1)} ${weightUnit}`
               : "—"
           }
-          sub={
+          deltaLabel={
             weightDeltaKg === null
               ? "log first"
               : `${weightDeltaKg <= 0 ? "▼" : "▲"} ${Math.abs(displayWeight(Math.abs(weightDeltaKg), weightUnit)).toFixed(1)}${weightUnit} 30d`
           }
-          subColor={weightDeltaKg !== null && weightDeltaKg <= 0 ? "#22a06b" : weightDeltaKg !== null ? "#e03030" : MUTED}
+          deltaColor={weightDeltaKg !== null && weightDeltaKg <= 0 ? "#22a06b" : weightDeltaKg !== null ? "#e03030" : MUTED}
           onClick={() => navigate({ to: "/weight" })}
         />
       </section>
@@ -415,8 +423,26 @@ function Dashboard() {
           setActiveTab(t);
           if (t === "trends") navigate({ to: "/weekly" });
           else if (t === "profile") navigate({ to: "/goals" });
+          else if (t === "diary") navigate({ to: "/diary" });
         }}
-        onAdd={() => { setFoodOpen(true); track("add_food_opened", { source: "fab" }); }}
+        onAdd={() => { setQuickOpen(true); track("quick_log_opened"); }}
+      />
+
+      <QuickLogPanel
+        open={quickOpen}
+        onClose={() => setQuickOpen(false)}
+        onVoice={() => { setVoiceOpen(true); track("voice_log_opened", { source: "quick_panel" }); }}
+        onScan={() => { setAiOpen(true); track("ai_scan_opened", { source: "quick_panel" }); }}
+        onAddWater={(ml) => { store.addWater(ml); track("water_logged", { ml, source: "quick_panel" }); }}
+        onLogWeight={() => navigate({ to: "/weight" })}
+      />
+
+      <MealsSummaryModal
+        open={summaryOpen}
+        onClose={() => setSummaryOpen(false)}
+        mealMap={mealMap}
+        onAddMeal={(m) => { setSummaryOpen(false); setActiveMeal(m); setFoodOpen(true); }}
+        onTapChip={(it) => { setSummaryOpen(false); setEditEntry(it); }}
       />
 
       {/* Sheets / dialogs */}
@@ -518,68 +544,32 @@ function Dashboard() {
         }}
       />
 
-      <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Sign out?</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to log out?</AlertDialogTitle>
+            <AlertDialogDescription>
               You'll need to sign back in to access your logs.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <button
-              onClick={() => setSignOutOpen(false)}
-              className="flex-1 rounded-full bg-cream py-2.5 text-sm font-extrabold"
-              style={{ color: DARK, border: CARD_BORDER }}
-            >
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="flex-1 rounded-full py-2.5 text-sm font-extrabold">
               Cancel
-            </button>
-            <button
+            </AlertDialogCancel>
+            <AlertDialogAction
               onClick={confirmSignOut}
               className="flex-1 rounded-full py-2.5 text-sm font-extrabold text-white"
               style={{ backgroundColor: RED }}
             >
-              <LogOut size={14} className="mr-1 inline" /> Sign Out
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <LogOut size={14} className="mr-1 inline" /> Log out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-function StatTile({
-  label, value, sub, pct, color, icon, subColor, onClick,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  pct?: number;
-  color?: string;
-  icon?: React.ReactNode;
-  subColor?: string;
-  onClick?: () => void;
-}) {
-  const Inner = (
-    <>
-      <div className="flex items-center gap-1">
-        {icon}
-        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>{label}</p>
-      </div>
-      <p className="mt-1 text-[16px] font-black leading-none" style={{ color: DARK }}>{value}</p>
-      <p className="mt-0.5 text-[10px] font-semibold" style={{ color: subColor ?? MUTED }}>{sub}</p>
-      {typeof pct === "number" && (
-        <div className="mt-2 h-1 w-full rounded-full" style={{ backgroundColor: "rgba(0,0,0,0.06)" }}>
-          <div className="h-1 rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: color }} />
-        </div>
-      )}
-    </>
-  );
-  const cls = "rounded-[14px] bg-white p-3 text-left";
-  const style = { border: CARD_BORDER };
-  if (onClick) {
-    return <button onClick={onClick} className={cls + " active:scale-95"} style={style}>{Inner}</button>;
-  }
-  return <div className={cls} style={style}>{Inner}</div>;
-}
+
+
 
