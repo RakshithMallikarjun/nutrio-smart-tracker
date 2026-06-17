@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus, Clock, Star, BookOpen, Folder } from "lucide-react";
+import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus, Clock, BookOpen, Folder } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
@@ -139,8 +139,6 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
 
   if (!open) return null;
   const meals = Object.keys(MEAL_LABELS) as MealType[];
-
-  const showFrequentStrip = tab === "recent" && !searchTerm && frequent.length > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(23,30,25,0.4)" }} onClick={onClose}>
