@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Mic, Camera, ScanBarcode, Copy, Plus, LogOut, Loader2, Pencil, Trash2, ChevronRight, Droplet } from "lucide-react";
+import { Flame, Mic, Camera, ScanBarcode, Copy, Plus, LogOut, Loader2, Pencil, Trash2, Droplet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { useStreak } from "@/hooks/use-streak";
@@ -583,5 +583,3 @@ function StatTile({
   return <div className={cls} style={style}>{Inner}</div>;
 }
 
-function ChevronUnused() { return <ChevronRight />; }
-void ChevronUnused;
