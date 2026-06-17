@@ -570,38 +570,6 @@ function Dashboard() {
   );
 }
 
-function StatTile({
-  label, value, sub, pct, color, icon, subColor, onClick,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  pct?: number;
-  color?: string;
-  icon?: React.ReactNode;
-  subColor?: string;
-  onClick?: () => void;
-}) {
-  const Inner = (
-    <>
-      <div className="flex items-center gap-1">
-        {icon}
-        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>{label}</p>
-      </div>
-      <p className="mt-1 text-[16px] font-black leading-none" style={{ color: DARK }}>{value}</p>
-      <p className="mt-0.5 text-[10px] font-semibold" style={{ color: subColor ?? MUTED }}>{sub}</p>
-      {typeof pct === "number" && (
-        <div className="mt-2 h-1 w-full rounded-full" style={{ backgroundColor: "rgba(0,0,0,0.06)" }}>
-          <div className="h-1 rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: color }} />
-        </div>
-      )}
-    </>
-  );
-  const cls = "rounded-[14px] bg-white p-3 text-left";
-  const style = { border: CARD_BORDER };
-  if (onClick) {
-    return <button onClick={onClick} className={cls + " active:scale-95"} style={style}>{Inner}</button>;
-  }
-  return <div className={cls} style={style}>{Inner}</div>;
-}
+
+
 
