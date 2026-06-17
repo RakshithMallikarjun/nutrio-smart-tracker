@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus, Clock, Star, BookOpen, Folder } from "lucide-react";
+import { X, Search, Plus, Minus, Sparkles, Trash2, Loader2, BookmarkPlus, Clock, BookOpen, Folder } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
@@ -36,7 +36,7 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
   const [qty, setQty] = useState<Record<string, number>>({});
   const [diet, setDiet] = useDietPref();
   const { customFoods, deleteCustomFood, addCustomFood } = useCustomFoods(userId);
-  const { recent, frequent } = useRecentFoods(userId);
+  const { recent } = useRecentFoods(userId);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Food | null>(null);
 
@@ -140,8 +140,6 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
   if (!open) return null;
   const meals = Object.keys(MEAL_LABELS) as MealType[];
 
-  const showFrequentStrip = tab === "recent" && !searchTerm && frequent.length > 0;
-
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(23,30,25,0.4)" }} onClick={onClose}>
       <div className="animate-fade-in flex h-[90vh] w-full max-w-md flex-col rounded-t-[2.5rem] bg-white p-6 pb-32" onClick={(e) => e.stopPropagation()}>
@@ -215,27 +213,6 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
                 </button>
               );
             })}
-          </div>
-        )}
-
-        {/* Frequent strip */}
-        {showFrequentStrip && (
-          <div className="mb-3">
-            <div className="mb-1.5 flex items-center gap-1">
-              <Star size={11} color="#ca0013" />
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#b7c6c2" }}>Frequent</p>
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {frequent.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => { onAdd(f, meal); toast.success(`✓ Added`); track("food_added", { food_name: f.name, category: "Frequent", meal, quantity: 1, calories: f.calories }); onClose(); }}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full bg-cream px-3 py-2 text-xs font-extrabold text-charcoal sage-border-soft"
-                >
-                  <Plus size={12} color="#ca0013" /> {f.name}
-                </button>
-              ))}
-            </div>
           </div>
         )}
 
