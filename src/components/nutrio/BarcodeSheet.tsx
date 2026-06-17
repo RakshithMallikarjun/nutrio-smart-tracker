@@ -67,11 +67,11 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
 
       // Auto torch (best effort) + capability check
       const track = stream.getVideoTracks()[0];
-      const caps = (track.getCapabilities?.() ?? {}) as MediaTrackCapabilities & { torch?: boolean };
+      const caps = (track.getCapabilities?.() ?? {}) as { torch?: boolean };
       if (caps.torch) {
         setTorchSupported(true);
         try {
-          await track.applyConstraints({ advanced: [{ torch: true } as MediaTrackConstraintSet] });
+          await track.applyConstraints({ advanced: [{ torch: true } as unknown as MediaTrackConstraintSet] });
           setTorchOn(true);
         } catch { /* ignore */ }
       }
@@ -205,7 +205,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
                       if (!t) return;
                       const next = !torchOn;
                       try {
-                        await t.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+                        await t.applyConstraints({ advanced: [{ torch: next } as unknown as MediaTrackConstraintSet] });
                         setTorchOn(next);
                       } catch { /* ignore */ }
                     }}
