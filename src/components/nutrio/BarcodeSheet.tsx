@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, ScanBarcode, Loader2, Check } from "lucide-react";
+import { X, ScanBarcode, Loader2, Check, Flashlight, FlashlightOff } from "lucide-react";
 
 import { MEAL_EMOJI, MEAL_LABELS, type Food, type MealType } from "@/lib/nutrio-data";
 import { toast } from "sonner";
@@ -24,6 +24,8 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
   const [notFound, setNotFound] = useState(false);
   const [meal, setMeal] = useState<MealType>(defaultMeal);
   const [manual, setManual] = useState("");
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -62,6 +64,17 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
         await videoRef.current.play();
       }
       setScanning(true);
+
+      // Auto torch (best effort) + capability check
+      const track = stream.getVideoTracks()[0];
+      const caps = (track.getCapabilities?.() ?? {}) as MediaTrackCapabilities & { torch?: boolean };
+      if (caps.torch) {
+        setTorchSupported(true);
+        try {
+          await track.applyConstraints({ advanced: [{ torch: true } as MediaTrackConstraintSet] });
+          setTorchOn(true);
+        } catch { /* ignore */ }
+      }
 
       const hasNative = typeof window !== "undefined" && "BarcodeDetector" in window;
 
@@ -165,8 +178,47 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
         </div>
 
         {supported && !found && !notFound && (
-          <div className="relative overflow-hidden rounded-[2rem] bg-cream">
+          <div className="relative overflow-hidden rounded-[2rem] bg-black">
             <video ref={videoRef} className="h-56 w-full object-cover" playsInline muted />
+            {scanning && (
+              <>
+                {/* corner brackets */}
+                <div className="pointer-events-none absolute inset-6">
+                  <CornerBracket pos="tl" />
+                  <CornerBracket pos="tr" />
+                  <CornerBracket pos="bl" />
+                  <CornerBracket pos="br" />
+                  {/* pulsing scan line */}
+                  <div
+                    className="absolute left-2 right-2 h-[2px] rounded-full"
+                    style={{
+                      backgroundColor: "#e03030",
+                      boxShadow: "0 0 8px rgba(224,48,48,0.9)",
+                      animation: "nutrio-scan 1.8s ease-in-out infinite",
+                    }}
+                  />
+                </div>
+                {torchSupported && (
+                  <button
+                    onClick={async () => {
+                      const t = streamRef.current?.getVideoTracks()[0];
+                      if (!t) return;
+                      const next = !torchOn;
+                      try {
+                        await t.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+                        setTorchOn(next);
+                      } catch { /* ignore */ }
+                    }}
+                    aria-label="Toggle torch"
+                    className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full"
+                    style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+                  >
+                    {torchOn ? <Flashlight size={16} color="#fff" /> : <FlashlightOff size={16} color="#fff" />}
+                  </button>
+                )}
+                <style>{`@keyframes nutrio-scan { 0%{ top: 0%; opacity:0.4 } 50%{ top: 100%; opacity:1 } 100%{ top: 0%; opacity:0.4 } }`}</style>
+              </>
+            )}
             {!scanning && (
               <button
                 onClick={start}
@@ -181,7 +233,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
         )}
 
         <p className="mt-3 text-center text-[11px] font-bold" style={{ color: "#b7c6c2" }}>
-          Point camera at a barcode or QR code — works on Android & iOS.
+          Hold steady — auto-detects EAN/UPC barcodes.
         </p>
 
         <div className="mt-3 flex gap-2">
