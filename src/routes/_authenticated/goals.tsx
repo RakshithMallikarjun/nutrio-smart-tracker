@@ -74,6 +74,7 @@ function GoalsPage() {
   const [showMacros, setShowMacros] = useState(false);
   const [remindersOn, setRemindersOn] = useState(false);
   const [requestingPerm, setRequestingPerm] = useState(false);
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
 
   useEffect(() => {
     setRemindersOn(getRemindersEnabled());
@@ -145,6 +146,7 @@ function GoalsPage() {
         if (p.data.height_cm) setHeight(Number(p.data.height_cm));
         if (p.data.activity_level && p.data.activity_level in ACTIVITY_MULT) setActivity(p.data.activity_level as Activity);
         if (p.data.goal_type && (p.data.goal_type === "loss" || p.data.goal_type === "maintain" || p.data.goal_type === "gain")) setGoalType(p.data.goal_type as GoalType);
+        if (p.data.weight_unit === "kg" || p.data.weight_unit === "lb") setWeightUnit(p.data.weight_unit);
       }
       setLoading(false);
     });
@@ -165,7 +167,8 @@ function GoalsPage() {
       supabase.from("goals").upsert({ user_id: user.id, ...goals, updated_at: new Date().toISOString() }),
       supabase.from("profiles").upsert({
         id: user.id, age, gender, weight_kg: weight, height_cm: height,
-        activity_level: activity, goal_type: goalType, updated_at: new Date().toISOString(),
+        activity_level: activity, goal_type: goalType, weight_unit: weightUnit,
+        updated_at: new Date().toISOString(),
       }),
     ]);
     setSaving(false);
