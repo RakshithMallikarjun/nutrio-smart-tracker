@@ -74,6 +74,7 @@ function GoalsPage() {
   const [showMacros, setShowMacros] = useState(false);
   const [remindersOn, setRemindersOn] = useState(false);
   const [requestingPerm, setRequestingPerm] = useState(false);
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
 
   useEffect(() => {
     setRemindersOn(getRemindersEnabled());
@@ -145,6 +146,7 @@ function GoalsPage() {
         if (p.data.height_cm) setHeight(Number(p.data.height_cm));
         if (p.data.activity_level && p.data.activity_level in ACTIVITY_MULT) setActivity(p.data.activity_level as Activity);
         if (p.data.goal_type && (p.data.goal_type === "loss" || p.data.goal_type === "maintain" || p.data.goal_type === "gain")) setGoalType(p.data.goal_type as GoalType);
+        if (p.data.weight_unit === "kg" || p.data.weight_unit === "lb") setWeightUnit(p.data.weight_unit);
       }
       setLoading(false);
     });
@@ -165,7 +167,8 @@ function GoalsPage() {
       supabase.from("goals").upsert({ user_id: user.id, ...goals, updated_at: new Date().toISOString() }),
       supabase.from("profiles").upsert({
         id: user.id, age, gender, weight_kg: weight, height_cm: height,
-        activity_level: activity, goal_type: goalType, updated_at: new Date().toISOString(),
+        activity_level: activity, goal_type: goalType, weight_unit: weightUnit,
+        updated_at: new Date().toISOString(),
       }),
     ]);
     setSaving(false);
@@ -248,6 +251,27 @@ function GoalsPage() {
             ))}
           </div>
         </div>
+
+        <div>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#b7c6c2" }}>Weight unit</p>
+          <div className="grid grid-cols-2 gap-1">
+            {(["kg", "lb"] as const).map((u) => (
+              <button
+                key={u}
+                onClick={() => { setWeightUnit(u); track("weight_unit_changed", { unit: u }); }}
+                className="rounded-lg py-2 text-xs font-extrabold uppercase"
+                style={{
+                  backgroundColor: weightUnit === u ? "#171e19" : "#fffdf6",
+                  color: weightUnit === u ? "#fff" : "#171e19",
+                  border: weightUnit === u ? "none" : "1px solid rgba(183,198,194,0.5)",
+                }}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
+
 
         <div className="flex items-center justify-between rounded-xl bg-cream p-3">
           <div className="text-xs font-bold text-charcoal">
