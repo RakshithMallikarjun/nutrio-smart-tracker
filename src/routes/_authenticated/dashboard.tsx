@@ -1,13 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Droplet, Trash2, Sparkles, ChevronRight, LogOut, Camera, Mic, ScanBarcode, Pencil, Loader2, Copy, Plus } from "lucide-react";
+import { Flame, Mic, Camera, ScanBarcode, Copy, Plus, LogOut, Loader2, Pencil, Trash2, Droplet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { useStreak } from "@/hooks/use-streak";
 import { useYesterdayMeals } from "@/hooks/use-yesterday-meals";
-import { MEAL_EMOJI, MEAL_LABELS, type MealType, type Food } from "@/lib/nutrio-data";
+import { useWeightLogs, displayWeight, type WeightUnit } from "@/hooks/use-weight-logs";
+import { MEAL_EMOJI, MEAL_LABELS, type MealType } from "@/lib/nutrio-data";
 import { Ring } from "@/components/nutrio/Ring";
-import { MacroBar } from "@/components/nutrio/MacroBar";
 import { BottomNav, type Tab } from "@/components/nutrio/BottomNav";
 import { FoodSearchSheet } from "@/components/nutrio/FoodSearchSheet";
 import { WaterSheet } from "@/components/nutrio/WaterSheet";
@@ -19,8 +19,6 @@ import { NutrioLoader } from "@/components/nutrio/NutrioLoader";
 import { Walkthrough } from "@/components/nutrio/Walkthrough";
 import { ReminderConsentModal } from "@/components/nutrio/ReminderConsentModal";
 import { MealReminderPopup } from "@/components/nutrio/MealReminderPopup";
-import { StreakCard } from "@/components/nutrio/StreakCard";
-import { WeightSummaryCard } from "@/components/nutrio/WeightSummaryCard";
 import { CopyYesterdaySheet } from "@/components/nutrio/CopyYesterdaySheet";
 import type { MealRow } from "@/hooks/use-nutrio-cloud";
 import {
@@ -33,7 +31,6 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { identifyUser, track, resetUser } from "@/lib/analytics";
-import type { WeightUnit } from "@/hooks/use-weight-logs";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -47,6 +44,19 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 const MEALS: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 const MEAL_STORE_KEY = "nutrio:selected-meal";
+
+const BG = "#f5f2ee";
+const CARD_BORDER = "0.5px solid #e8e4df";
+const RED = "#e03030";
+const DARK = "#1a1a1a";
+const MUTED = "#8a8580";
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
 
 function autoMeal(): MealType {
   const h = new Date().getHours();
@@ -62,6 +72,7 @@ function Dashboard() {
   const store = useNutrioCloud(user?.id);
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [activeMeal, setActiveMeal] = useState<MealType>(autoMeal());
+  const [expandedMeal, setExpandedMeal] = useState<MealType | null>(null);
   const [foodOpen, setFoodOpen] = useState(false);
   const [waterOpen, setWaterOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -73,6 +84,7 @@ function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const [copyMeal, setCopyMeal] = useState<MealType | null>(null);
   const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
+  const { logs: weightLogs } = useWeightLogs(user?.id);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -92,7 +104,6 @@ function Dashboard() {
     }
   }, [user?.id, store.displayName]);
 
-  // Restore last-selected meal across sessions.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = window.localStorage.getItem(MEAL_STORE_KEY) as MealType | null;
@@ -102,14 +113,18 @@ function Dashboard() {
     if (typeof window !== "undefined") window.localStorage.setItem(MEAL_STORE_KEY, activeMeal);
   }, [activeMeal]);
 
-  const remaining = Math.max(0, store.goals.calories - store.totals.calories);
+  const calGoal = store.goals.calories || 1;
+  const calIntake = Math.round(store.totals.calories);
+  const remaining = Math.max(0, store.goals.calories - calIntake);
+  const calPct = Math.round((calIntake / calGoal) * 100);
+
   const mealMap = useMemo(() => {
     const map = new Map<MealType, typeof store.meals>();
     MEALS.forEach((m) => map.set(m, []));
     store.meals.forEach((entry) => map.get(entry.meal_type)?.push(entry));
     return map;
   }, [store.meals]);
-  const mealsForActive = mealMap.get(activeMeal) ?? [];
+
   const loggedMealTypes = useMemo(() => new Set(store.meals.map((m) => m.meal_type)), [store.meals]);
   const streak = useStreak({
     userId: user?.id,
@@ -122,6 +137,16 @@ function Dashboard() {
   const { yesterdayItems } = useYesterdayMeals(user?.id);
   const yesterdayCountFor = (m: MealType) => yesterdayItems.filter((y) => y.meal === m).length;
 
+  // Weight delta over last 30 days (kg)
+  const weightDeltaKg = useMemo(() => {
+    if (weightLogs.length < 2) return null;
+    const latest = weightLogs[0];
+    const cutoff = Date.now() - 30 * 86400_000;
+    const old = weightLogs.find((l) => new Date(l.log_date).getTime() <= cutoff) ?? weightLogs[weightLogs.length - 1];
+    return latest.weight_kg - old.weight_kg;
+  }, [weightLogs]);
+  const latestWeight = weightLogs[0]?.weight_kg ?? null;
+
   const confirmSignOut = async () => {
     resetUser();
     await supabase.auth.signOut();
@@ -130,233 +155,271 @@ function Dashboard() {
 
   if (bootLoading) {
     return (
-      <div className="mx-auto flex min-h-screen w-full max-w-md items-center justify-center" style={{ backgroundColor: "#eeebe3" }}>
+      <div className="mx-auto flex min-h-screen w-full max-w-md items-center justify-center" style={{ backgroundColor: BG }}>
         <NutrioLoader />
       </div>
     );
   }
 
+  const macros = [
+    { label: "Protein", value: store.totals.protein, max: store.goals.protein, color: RED },
+    { label: "Carbs", value: store.totals.carbs, max: store.goals.carbs, color: "#f5c542" },
+    { label: "Fat", value: store.totals.fat, max: store.goals.fat, color: "#7a9990" },
+  ];
+
+  const quickAdds = [
+    { icon: <Mic size={18} />, label: "Voice log", onClick: () => { setVoiceOpen(true); track("voice_log_opened"); } },
+    { icon: <Camera size={18} />, label: "Scan dish", onClick: () => { setAiOpen(true); track("ai_scan_opened"); } },
+    { icon: <ScanBarcode size={18} />, label: "Barcode", onClick: () => { setBarcodeOpen(true); track("barcode_opened"); } },
+    { icon: <Copy size={18} />, label: "Copy prev.", onClick: () => { setCopyMeal(autoMeal()); track("copy_yesterday_opened", { source: "quick_action" }); } },
+  ];
+
   return (
-    <div className="mx-auto min-h-screen w-full max-w-md pb-32" style={{ backgroundColor: "#eeebe3" }}>
+    <div className="mx-auto min-h-screen w-full max-w-md pb-28" style={{ backgroundColor: BG }}>
       <Walkthrough />
       <ReminderConsentModal userId={user?.id} />
       <MealReminderPopup
-        loggedMealTypes={new Set(store.meals.map((m) => m.meal_type))}
+        loggedMealTypes={loggedMealTypes}
         onLogMeal={(meal) => {
           setActiveMeal(meal);
           setFoodOpen(true);
         }}
       />
 
-      <StreakCard streak={streak} />
-      <WeightSummaryCard userId={user?.id} unit={weightUnit} />
-
-      {/* Header */}
+      {/* 1. Header */}
       <header className="flex items-center justify-between px-5 pt-12">
         <div className="min-w-0 flex-1">
-          <p className="text-label" style={{ color: "#b7c6c2" }}>Good morning</p>
-          <h1 className="mt-1 truncate text-[26px] font-black leading-tight text-charcoal">
+          <p className="text-xs font-semibold" style={{ color: MUTED }}>{greeting()}</p>
+          <h1 className="mt-0.5 truncate text-[26px] font-black leading-tight" style={{ color: DARK }}>
             Hello, {store.displayName}
           </h1>
         </div>
-        <div className="ml-3 flex shrink-0 items-center gap-1.5">
-          <button onClick={() => setSignOutOpen(true)} aria-label="Sign out" className="flex h-11 w-11 items-center justify-center rounded-full bg-white sage-border">
-            <LogOut size={18} />
-          </button>
-          <div className="flex h-11 w-11 items-center justify-center rounded-full text-base font-black text-white" style={{ backgroundColor: "#171e19", border: "2px solid #ffffff" }}>
-            {store.displayName.charAt(0).toUpperCase()}
+        <div className="ml-3 flex shrink-0 items-center gap-2">
+          <div
+            className="flex h-9 items-center gap-1.5 rounded-full px-3"
+            style={{ backgroundColor: "#fff4d6", border: "0.5px solid #f0d99a" }}
+            aria-label={`Streak ${streak.currentStreak} days`}
+          >
+            <Flame size={14} color="#d97706" fill="#f59e0b" />
+            <span className="text-xs font-extrabold" style={{ color: "#92400e" }}>{streak.currentStreak} {streak.currentStreak === 1 ? "day" : "days"}</span>
           </div>
+          <button
+            onClick={() => setSignOutOpen(true)}
+            aria-label="Profile / Sign out"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
+            style={{ backgroundColor: DARK }}
+          >
+            {store.displayName.charAt(0).toUpperCase()}
+          </button>
         </div>
       </header>
 
-      {/* Hero card */}
-      <section className="relative mx-5 mt-5 overflow-hidden rounded-[2rem] bg-white p-5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full" style={{ backgroundColor: "rgba(183,198,194,0.22)" }} />
-        <div className="relative flex items-center gap-3">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-cream text-2xl">🔥</div>
-          <div className="min-w-0">
-            <p className="text-label" style={{ color: "#b7c6c2" }}>Today's intake</p>
-            <p className="text-2xl font-black leading-tight text-charcoal">{Math.round(store.totals.calories)} kcal</p>
-            <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>of {store.goals.calories} kcal goal</p>
+      {/* 2. Calorie hero card */}
+      <section
+        className="mx-5 mt-5 rounded-[20px] p-5"
+        style={{ backgroundColor: DARK, color: "#fff" }}
+      >
+        <div className="flex items-center gap-5">
+          <div className="shrink-0">
+            <Ring
+              value={calIntake}
+              max={calGoal}
+              size={120}
+              stroke={11}
+              color={RED}
+              trackColor="rgba(255,255,255,0.10)"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.55)" }}>kcal left</p>
+              <p className="mt-0.5 text-[26px] font-black leading-none">{remaining}</p>
+            </Ring>
           </div>
-        </div>
-
-        <div className="mt-5 flex flex-col items-center gap-5">
-          <Ring value={store.totals.calories} max={store.goals.calories} size={150} stroke={12}>
-            <Flame size={18} color="#ca0013" />
-            <p className="mt-1 text-2xl font-black leading-none text-charcoal">{remaining}</p>
-            <p className="mt-1 text-[9px] font-bold uppercase tracking-wider" style={{ color: "#b7c6c2" }}>kcal left</p>
-          </Ring>
-
-          <div className="grid w-full grid-cols-2 gap-2">
-            <MacroBar label="Protein" value={store.totals.protein} max={store.goals.protein} color="#ca0013" />
-            <MacroBar label="Carbs" value={store.totals.carbs} max={store.goals.carbs} color="#171e19" />
-            <MacroBar label="Fat" value={store.totals.fat} max={store.goals.fat} color="#b7c6c2" />
-            <MacroBar label="Fiber" value={store.totals.fiber} max={store.goals.fiber} color="#7a9990" />
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-center gap-2.5 rounded-2xl p-3" style={{ backgroundColor: "rgba(183,198,194,0.2)" }}>
-          <Sparkles size={16} color="#171e19" className="shrink-0" />
-          <p className="text-xs font-bold leading-snug text-charcoal">
-            {store.goals.calories > 0
-              ? `${Math.round((store.totals.calories / store.goals.calories) * 100)}% of daily calories logged.`
-              : "Set your calorie goal to track progress."}
-          </p>
-        </div>
-      </section>
-
-      {/* Quick actions */}
-      <div className="mx-5 mt-3 grid grid-cols-3 gap-2">
-        <QuickAction icon={<Mic size={16} />} label="Voice" onClick={() => { setVoiceOpen(true); track("voice_log_opened"); }} />
-        <QuickAction icon={<Camera size={16} />} label="Scan dish" onClick={() => { setAiOpen(true); track("ai_scan_opened"); }} />
-        <QuickAction icon={<ScanBarcode size={16} />} label="Barcode" onClick={() => { setBarcodeOpen(true); track("barcode_opened"); }} />
-      </div>
-
-      {/* Water widget */}
-      <button onClick={() => { setWaterOpen(true); track("water_opened"); }} className="mx-5 mt-3 flex w-[calc(100%-2.5rem)] items-center justify-between rounded-[1.5rem] bg-white p-3.5 text-left sage-border-soft">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: "rgba(202,0,19,0.1)" }}>
-            <Droplet size={20} color="#ca0013" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-label" style={{ color: "#b7c6c2" }}>Water</p>
-            <p className="text-base font-black leading-tight text-charcoal">
-              {(store.waterTotal / 1000).toFixed(2)}
-              <span className="ml-1 text-xs font-bold" style={{ color: "#b7c6c2" }}>/ {(store.goals.water_ml / 1000).toFixed(1)} L</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.55)" }}>Today's intake</p>
+            <p className="mt-1 text-[30px] font-black leading-none">{calIntake}<span className="ml-1 text-base font-bold" style={{ color: "rgba(255,255,255,0.55)" }}>kcal</span></p>
+            <p className="mt-1 text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>
+              of {store.goals.calories} kcal goal · {calPct}%
             </p>
-            <div className="mt-1 h-1.5 w-32 rounded-full" style={{ backgroundColor: "rgba(183,198,194,0.3)" }}>
-              <div className="h-1.5 rounded-full transition-[width]" style={{ width: `${Math.min(100, (store.waterTotal / store.goals.water_ml) * 100)}%`, backgroundColor: "#ca0013" }} />
-            </div>
           </div>
         </div>
-        <ChevronRight color="#b7c6c2" className="shrink-0" />
-      </button>
 
-      {/* Quick water adds — one-tap */}
-      <div className="mx-5 mt-2 grid grid-cols-4 gap-2">
-        {[250, 500, 750].map((ml) => (
-          <button
-            key={ml}
-            onClick={() => { store.addWater(ml); track("water_logged", { amount_ml: ml, source: "dashboard" }); toast.success(`+${ml} ml`); }}
-            className="flex items-center justify-center gap-1 rounded-full bg-white py-2 text-[11px] font-extrabold text-charcoal sage-border-soft active:scale-95"
-          >
-            <Plus size={11} color="#ca0013" />{ml}
-          </button>
-        ))}
-        <button
-          onClick={() => { setWaterOpen(true); track("water_opened", { source: "custom" }); }}
-          className="flex items-center justify-center rounded-full py-2 text-[11px] font-extrabold text-white"
-          style={{ backgroundColor: "#171e19" }}
-        >
-          Custom
-        </button>
-      </div>
-
-      {/* Today's overview */}
-      <section className="mx-5 mt-5">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black text-charcoal">Today's Overview</h2>
-          <span className="text-label" style={{ color: "#b7c6c2" }}>
-            {Math.round(store.totals.calories)} / {store.goals.calories} kcal
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {MEALS.map((m) => {
-            const items = mealMap.get(m) ?? [];
-            const kcal = items.reduce((a, b) => a + Number(b.calories), 0);
-            const active = m === activeMeal;
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          {macros.map((m) => {
+            const pct = m.max > 0 ? Math.min(100, (m.value / m.max) * 100) : 0;
             return (
-              <button
-                key={m}
-                onClick={() => { setActiveMeal(m); track("meal_tab_switched", { meal: m }); }}
-                className="flex items-center gap-2.5 rounded-2xl p-2.5 text-left transition-colors"
-                style={{
-                  backgroundColor: active ? "#171e19" : "#ffffff",
-                  border: active ? "none" : "1px solid rgba(183,198,194,0.5)",
-                }}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base" style={{ backgroundColor: active ? "#ca0013" : "rgba(202,0,19,0.1)" }}>
-                  {MEAL_EMOJI[m]}
+              <div key={m.label}>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[11px] font-bold" style={{ color: "rgba(255,255,255,0.7)" }}>{m.label}</span>
+                  <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>
+                    {Math.round(m.value)}/{m.max}g
+                  </span>
                 </div>
-                <div className="min-w-0 flex-1 leading-tight">
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: active ? "rgba(255,255,255,0.6)" : "#b7c6c2" }}>
-                    {MEAL_LABELS[m]}
-                  </p>
-                  <p className="text-sm font-extrabold" style={{ color: active ? "#ffffff" : "#171e19" }}>{Math.round(kcal)} kcal</p>
-                  <p className="text-[10px] font-bold" style={{ color: active ? "rgba(255,255,255,0.6)" : "#b7c6c2" }}>
-                    {items.length} {items.length === 1 ? "item" : "items"}
-                  </p>
+                <div className="mt-1.5 h-1 w-full rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.10)" }}>
+                  <div className="h-1 rounded-full transition-[width]" style={{ width: `${pct}%`, backgroundColor: m.color }} />
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
       </section>
 
-      {/* Active meal feed */}
-      <section className="mx-5 mt-5">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black text-charcoal">
-            {MEAL_LABELS[activeMeal]}
-            <span className="ml-1.5 text-sm" style={{ color: "#b7c6c2" }}>· {mealsForActive.length}</span>
-          </h2>
-          <div className="flex items-center gap-2">
-            {yesterdayCountFor(activeMeal) > 0 && (
-              <button
-                onClick={() => { setCopyMeal(activeMeal); track("copy_yesterday_opened", { meal: activeMeal }); }}
-                className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-extrabold text-charcoal sage-border-soft"
-                aria-label="Copy from yesterday"
-              >
-                <Copy size={11} color="#ca0013" /> Copy yesterday
-              </button>
-            )}
-            <button onClick={() => { setFoodOpen(true); track("add_food_opened", { source: "meal_header", meal: activeMeal }); }} className="text-label" style={{ color: "#ca0013" }}>+ Add</button>
-          </div>
-        </div>
+      {/* 3. Quick actions row */}
+      <div className="mx-5 mt-4 grid grid-cols-4 gap-2">
+        {quickAdds.map((q) => (
+          <button
+            key={q.label}
+            onClick={q.onClick}
+            className="flex flex-col items-center justify-center gap-1.5 rounded-xl bg-white py-3 transition-colors active:scale-95"
+            style={{ border: CARD_BORDER }}
+          >
+            <span style={{ color: RED }}>{q.icon}</span>
+            <span className="text-[10.5px] font-extrabold leading-none" style={{ color: DARK }}>{q.label}</span>
+          </button>
+        ))}
+      </div>
 
-        {mealsForActive.length === 0 ? (
-          <div className="rounded-2xl bg-white p-5 text-center sage-border">
-            <p className="text-3xl">{MEAL_EMOJI[activeMeal]}</p>
-            <p className="mt-2 text-sm font-extrabold text-charcoal">No {MEAL_LABELS[activeMeal].toLowerCase()} logged</p>
-            <p className="text-xs font-bold" style={{ color: "#b7c6c2" }}>Tap the red button below to add an item.</p>
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {mealsForActive.map((m) => (
-              <li key={m.id} className="animate-fade-in flex items-center gap-3 rounded-2xl bg-white p-3 sage-border">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl" style={{ backgroundColor: "rgba(202,0,19,0.1)" }}>
-                  {MEAL_EMOJI[m.meal_type]}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-extrabold leading-tight text-charcoal">{m.food_name}</p>
-                  <p className="mt-0.5 truncate text-[11px] font-bold" style={{ color: "#b7c6c2" }}>
-                    {m.serving} · {Math.round(m.calories)} kcal · P{Math.round(m.protein)} C{Math.round(m.carbs)} F{Math.round(m.fat)}
-                  </p>
-                </div>
-                <button onClick={() => { setEditEntry(m); track("meal_edit_opened", { food_name: m.food_name }); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-cream" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Edit">
-                  <Pencil size={14} />
+      {/* 4. Today's meals */}
+      <section className="mx-5 mt-5">
+        <div className="mb-2.5 flex items-center justify-between">
+          <h2 className="text-[15px] font-black" style={{ color: DARK }}>Today's meals</h2>
+          <button
+            onClick={() => { setFoodOpen(true); track("add_food_opened", { source: "view_all" }); }}
+            className="text-xs font-bold"
+            style={{ color: RED }}
+          >
+            View all
+          </button>
+        </div>
+        <div className="rounded-[20px] bg-white" style={{ border: CARD_BORDER }}>
+          {MEALS.map((m, i) => {
+            const items = mealMap.get(m) ?? [];
+            const kcal = Math.round(items.reduce((a, b) => a + Number(b.calories), 0));
+            const isOpen = expandedMeal === m;
+            const yCount = yesterdayCountFor(m);
+            return (
+              <div key={m} style={{ borderTop: i === 0 ? "none" : CARD_BORDER }}>
+                <button
+                  onClick={() => { setActiveMeal(m); setExpandedMeal(isOpen ? null : m); track("meal_tab_switched", { meal: m }); }}
+                  className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+                >
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg"
+                    style={{ backgroundColor: items.length === 0 ? "#f5efe7" : "rgba(224,48,48,0.10)" }}
+                  >
+                    {MEAL_EMOJI[m]}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[14px] font-extrabold leading-tight" style={{ color: DARK }}>{MEAL_LABELS[m]}</p>
+                    {items.length === 0 ? (
+                      <p className="text-[11px] font-semibold" style={{ color: "#d99898" }}>Not logged yet</p>
+                    ) : (
+                      <p className="text-[11px] font-semibold" style={{ color: MUTED }}>
+                        {kcal} kcal · {items.length} {items.length === 1 ? "item" : "items"}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setActiveMeal(m); setFoodOpen(true); track("add_food_opened", { source: "meal_row", meal: m }); }}
+                    aria-label={`Add to ${MEAL_LABELS[m]}`}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-transform active:scale-90"
+                    style={{ backgroundColor: DARK }}
+                  >
+                    <Plus size={16} color="#fff" strokeWidth={3} />
+                  </button>
                 </button>
-                <button onClick={() => { store.removeMeal(m.id); track("meal_removed", { food_name: m.food_name, meal_type: m.meal_type }); }} className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-vibrant" style={{ border: "1px solid rgba(183,198,194,0.5)" }} aria-label="Remove">
-                  <Trash2 size={15} className="group-hover:text-white" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+
+                {isOpen && items.length > 0 && (
+                  <ul className="px-4 pb-3 pt-0">
+                    {items.map((it) => (
+                      <li key={it.id} className="flex items-center gap-2.5 rounded-lg px-2 py-2" style={{ backgroundColor: "#faf8f5" }}>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12.5px] font-extrabold" style={{ color: DARK }}>{it.food_name}</p>
+                          <p className="truncate text-[10.5px] font-semibold" style={{ color: MUTED }}>
+                            {it.serving} · {Math.round(it.calories)} kcal
+                          </p>
+                        </div>
+                        <button onClick={() => setEditEntry(it)} aria-label="Edit" className="flex h-7 w-7 items-center justify-center rounded-md" style={{ border: CARD_BORDER }}>
+                          <Pencil size={11} color={MUTED} />
+                        </button>
+                        <button onClick={() => { store.removeMeal(it.id); track("meal_removed", { food_name: it.food_name, meal_type: it.meal_type }); }} aria-label="Remove" className="flex h-7 w-7 items-center justify-center rounded-md" style={{ border: CARD_BORDER }}>
+                          <Trash2 size={11} color={MUTED} />
+                        </button>
+                      </li>
+                    ))}
+                    {yCount > 0 && (
+                      <button
+                        onClick={() => { setCopyMeal(m); track("copy_yesterday_opened", { meal: m }); }}
+                        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-extrabold"
+                        style={{ backgroundColor: "#faf8f5", color: RED }}
+                      >
+                        <Copy size={11} /> Copy yesterday ({yCount})
+                      </button>
+                    )}
+                  </ul>
+                )}
+                {isOpen && items.length === 0 && yCount > 0 && (
+                  <div className="px-4 pb-3">
+                    <button
+                      onClick={() => { setCopyMeal(m); track("copy_yesterday_opened", { meal: m }); }}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[11px] font-extrabold"
+                      style={{ backgroundColor: "#faf8f5", color: RED }}
+                    >
+                      <Copy size={11} /> Copy yesterday ({yCount})
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </section>
 
+      {/* 5. Stats strip */}
+      <section className="mx-5 mt-4 grid grid-cols-3 gap-2">
+        <StatTile
+          label="Water"
+          value={`${(store.waterTotal / 1000).toFixed(1)}L`}
+          sub={`of ${(store.goals.water_ml / 1000).toFixed(1)}L`}
+          pct={Math.min(100, (store.waterTotal / Math.max(1, store.goals.water_ml)) * 100)}
+          color="#3b82f6"
+          icon={<Droplet size={12} color="#3b82f6" />}
+          onClick={() => { setWaterOpen(true); track("water_opened", { source: "stat_tile" }); }}
+        />
+        <StatTile
+          label="Consistency"
+          value={`${streak.consistencyScore}%`}
+          sub="today"
+          pct={streak.consistencyScore}
+          color="#22a06b"
+        />
+        <StatTile
+          label="Weight"
+          value={
+            latestWeight !== null
+              ? `${displayWeight(latestWeight, weightUnit).toFixed(1)}${weightUnit}`
+              : "—"
+          }
+          sub={
+            weightDeltaKg === null
+              ? "log first"
+              : `${weightDeltaKg <= 0 ? "▼" : "▲"} ${Math.abs(displayWeight(Math.abs(weightDeltaKg), weightUnit)).toFixed(1)}${weightUnit} 30d`
+          }
+          subColor={weightDeltaKg !== null && weightDeltaKg <= 0 ? "#22a06b" : weightDeltaKg !== null ? "#e03030" : MUTED}
+          onClick={() => navigate({ to: "/weight" })}
+        />
+      </section>
+
+      {/* Bottom nav */}
       <BottomNav
         active={activeTab}
         onChange={(t) => {
           setActiveTab(t);
           if (t === "trends") navigate({ to: "/weekly" });
-          if (t === "water") setWaterOpen(true);
-          if (t === "profile") navigate({ to: "/goals" });
+          else if (t === "profile") navigate({ to: "/goals" });
         }}
         onAdd={() => { setFoodOpen(true); track("add_food_opened", { source: "fab" }); }}
       />
 
+      {/* Sheets / dialogs */}
       <FoodSearchSheet
         open={foodOpen}
         onClose={() => setFoodOpen(false)}
@@ -368,7 +431,6 @@ function Dashboard() {
           toast.success(`Added to ${MEAL_LABELS[meal]}`);
         }}
       />
-
       <WaterSheet
         open={waterOpen}
         onClose={() => setWaterOpen(false)}
@@ -377,7 +439,6 @@ function Dashboard() {
         onAdd={store.addWater}
         onUndo={store.undoWater}
       />
-
       <AiPhotoSheet
         open={aiOpen}
         onClose={() => setAiOpen(false)}
@@ -390,7 +451,6 @@ function Dashboard() {
           setTimeout(() => setSyncing(false), 1500);
         }}
       />
-
       <VoiceLogSheet
         open={voiceOpen}
         onClose={() => setVoiceOpen(false)}
@@ -413,8 +473,6 @@ function Dashboard() {
           }
         }}
       />
-
-
       <BarcodeSheet
         open={barcodeOpen}
         onClose={() => setBarcodeOpen(false)}
@@ -429,12 +487,11 @@ function Dashboard() {
       />
 
       {syncing && (
-        <div className="fixed bottom-24 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white px-4 py-2 shadow-lg sage-border">
-          <Loader2 size={14} className="animate-spin" color="#ca0013" />
-          <span className="text-xs font-extrabold text-charcoal">Updating your log…</span>
+        <div className="fixed bottom-24 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white px-4 py-2 shadow-lg" style={{ border: CARD_BORDER }}>
+          <Loader2 size={14} className="animate-spin" color={RED} />
+          <span className="text-xs font-extrabold" style={{ color: DARK }}>Updating your log…</span>
         </div>
       )}
-
 
       <EditMealSheet
         entry={editEntry}
@@ -461,9 +518,6 @@ function Dashboard() {
         }}
       />
 
-
-
-
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -475,16 +529,17 @@ function Dashboard() {
           <DialogFooter className="gap-2 sm:gap-2">
             <button
               onClick={() => setSignOutOpen(false)}
-              className="flex-1 rounded-full bg-cream py-2.5 text-sm font-extrabold text-charcoal sage-border-soft"
+              className="flex-1 rounded-full bg-cream py-2.5 text-sm font-extrabold"
+              style={{ color: DARK, border: CARD_BORDER }}
             >
               Cancel
             </button>
             <button
               onClick={confirmSignOut}
               className="flex-1 rounded-full py-2.5 text-sm font-extrabold text-white"
-              style={{ backgroundColor: "#ca0013" }}
+              style={{ backgroundColor: RED }}
             >
-              Sign Out
+              <LogOut size={14} className="mr-1 inline" /> Sign Out
             </button>
           </DialogFooter>
         </DialogContent>
@@ -493,14 +548,38 @@ function Dashboard() {
   );
 }
 
-function QuickAction({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center justify-center gap-1.5 rounded-2xl bg-white py-2.5 text-xs font-extrabold text-charcoal transition-colors hover:bg-cream sage-border-soft"
-    >
-      <span style={{ color: "#ca0013" }}>{icon}</span>
-      {label}
-    </button>
+function StatTile({
+  label, value, sub, pct, color, icon, subColor, onClick,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  pct?: number;
+  color?: string;
+  icon?: React.ReactNode;
+  subColor?: string;
+  onClick?: () => void;
+}) {
+  const Inner = (
+    <>
+      <div className="flex items-center gap-1">
+        {icon}
+        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>{label}</p>
+      </div>
+      <p className="mt-1 text-[16px] font-black leading-none" style={{ color: DARK }}>{value}</p>
+      <p className="mt-0.5 text-[10px] font-semibold" style={{ color: subColor ?? MUTED }}>{sub}</p>
+      {typeof pct === "number" && (
+        <div className="mt-2 h-1 w-full rounded-full" style={{ backgroundColor: "rgba(0,0,0,0.06)" }}>
+          <div className="h-1 rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: color }} />
+        </div>
+      )}
+    </>
   );
+  const cls = "rounded-[14px] bg-white p-3 text-left";
+  const style = { border: CARD_BORDER };
+  if (onClick) {
+    return <button onClick={onClick} className={cls + " active:scale-95"} style={style}>{Inner}</button>;
+  }
+  return <div className={cls} style={style}>{Inner}</div>;
 }
+
