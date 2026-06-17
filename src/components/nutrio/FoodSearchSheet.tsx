@@ -216,27 +216,6 @@ export function FoodSearchSheet({ open, onClose, defaultMeal, onAdd, userId }: P
           </div>
         )}
 
-        {/* Frequent strip */}
-        {showFrequentStrip && (
-          <div className="mb-3">
-            <div className="mb-1.5 flex items-center gap-1">
-              <Star size={11} color="#ca0013" />
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#b7c6c2" }}>Frequent</p>
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {frequent.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => { onAdd(f, meal); toast.success(`✓ Added`); track("food_added", { food_name: f.name, category: "Frequent", meal, quantity: 1, calories: f.calories }); onClose(); }}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full bg-cream px-3 py-2 text-xs font-extrabold text-charcoal sage-border-soft"
-                >
-                  <Plus size={12} color="#ca0013" /> {f.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Results */}
         <div className="flex-1 space-y-2 overflow-y-auto">
           {results.map((f) => {
