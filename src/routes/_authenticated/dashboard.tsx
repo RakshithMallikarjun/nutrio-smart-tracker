@@ -269,7 +269,7 @@ function Dashboard() {
       </section>
 
       {/* 3. Quick actions row */}
-      <div className="mx-5 mt-4 grid grid-cols-4 gap-2">
+      <div className="mx-5 mt-4 grid grid-cols-3 gap-2">
         {quickAdds.map((q) => (
           <button
             key={q.label}
