@@ -96,13 +96,23 @@ function Dashboard() {
   const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [heightCm, setHeightCm] = useState<number | null>(null);
+  const [targetBmi, setTargetBmi] = useState<number | null>(null);
+  const [bmiEditOpen, setBmiEditOpen] = useState(false);
+  const [targetBmiDraft, setTargetBmiDraft] = useState("");
   const { logs: weightLogs } = useWeightLogs(user?.id);
 
   useEffect(() => {
     if (!user?.id) return;
-    supabase.from("profiles").select("weight_unit").eq("id", user.id).maybeSingle().then(({ data }) => {
+    supabase.from("profiles").select("weight_unit,height_cm").eq("id", user.id).maybeSingle().then(({ data }) => {
       if (data?.weight_unit === "lb" || data?.weight_unit === "kg") setWeightUnit(data.weight_unit);
+      if (data?.height_cm) setHeightCm(Number(data.height_cm));
     });
+    if (typeof window !== "undefined") {
+      const raw = window.localStorage.getItem(`nutrio:target_bmi:${user.id}`);
+      const n = raw ? Number(raw) : NaN;
+      if (Number.isFinite(n) && n >= 15 && n <= 40) setTargetBmi(n);
+    }
   }, [user?.id]);
 
   useEffect(() => {
