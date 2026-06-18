@@ -1,12 +1,7 @@
-const CACHE = "nutrio-v1";
-const SHELL = ["/", "/dashboard", "/manifest.json"];
+// Nutrio service worker — network-first for HTML/JS/CSS, cache-first only for hashed /assets/.
+const CACHE = "nutrio-v3";
 
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) =>
-      Promise.allSettled(SHELL.map((u) => c.add(u).catch(() => null)))
-    )
-  );
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
@@ -14,28 +9,51 @@ self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
+});
+
+self.addEventListener("message", (e) => {
+  if (e.data === "SKIP_WAITING") self.skipWaiting();
+  if (e.data === "CLEAR_CACHES") {
+    e.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))));
+  }
 });
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;
-  e.respondWith(
-    caches.match(e.request).then((cached) => {
-      if (e.request.mode === "navigate") {
-        return fetch(e.request)
-          .then((res) => {
+
+  // Cache-first only for fingerprinted Vite assets (filename hash → immutable).
+  const isHashedAsset = /\/assets\/.+\.[a-f0-9]{6,}\.(js|css|woff2?|png|jpg|jpeg|svg|webp)$/i.test(url.pathname);
+
+  if (isHashedAsset) {
+    e.respondWith(
+      caches.match(e.request).then((cached) =>
+        cached ?? fetch(e.request).then((res) => {
+          if (res.ok) {
             const clone = res.clone();
             caches.open(CACHE).then((c) => c.put(e.request, clone));
-            return res;
-          })
-          .catch(() => cached ?? caches.match("/dashboard"));
-      }
-      return cached ?? fetch(e.request);
-    })
+          }
+          return res;
+        })
+      )
+    );
+    return;
+  }
+
+  // Network-first for everything else (HTML, JSON, dynamic data, unhashed JS).
+  e.respondWith(
+    fetch(e.request)
+      .then((res) => {
+        if (e.request.mode === "navigate" && res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, clone));
+        }
+        return res;
+      })
+      .catch(() => caches.match(e.request).then((cached) => cached ?? caches.match("/dashboard")))
   );
 });
 
