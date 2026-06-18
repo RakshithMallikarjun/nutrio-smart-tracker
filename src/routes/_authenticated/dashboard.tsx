@@ -426,6 +426,14 @@ function Dashboard() {
         />
       </section>
 
+      {/* 6. BMI card */}
+      <BmiCard
+        heightCm={heightCm}
+        weightKg={latestWeight ?? null}
+        targetBmi={targetBmi}
+        onEditTarget={() => { setTargetBmiDraft(targetBmi ? String(targetBmi) : "22"); setBmiEditOpen(true); }}
+      />
+
       {/* Bottom nav */}
       <BottomNav
         active={activeTab}
