@@ -562,6 +562,45 @@ function Dashboard() {
         }}
       />
 
+      <AlertDialog open={bmiEditOpen} onOpenChange={setBmiEditOpen}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Set target BMI</AlertDialogTitle>
+            <AlertDialogDescription>
+              Healthy range is 18.5 – 24.9. Your current height is used to compute the target weight.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            type="number"
+            inputMode="decimal"
+            min={15}
+            max={40}
+            step={0.1}
+            value={targetBmiDraft}
+            onChange={(e) => setTargetBmiDraft(e.target.value)}
+            className="rounded-xl"
+          />
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="flex-1 rounded-full py-2.5 text-sm font-extrabold">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const n = Number(targetBmiDraft);
+                if (!Number.isFinite(n) || n < 15 || n > 40) { toast.error("Enter a BMI between 15 and 40"); return; }
+                setTargetBmi(n);
+                if (user?.id && typeof window !== "undefined") {
+                  window.localStorage.setItem(`nutrio:target_bmi:${user.id}`, String(n));
+                }
+                toast.success("Target BMI saved");
+              }}
+              className="flex-1 rounded-full py-2.5 text-sm font-extrabold text-white"
+              style={{ backgroundColor: RED }}
+            >
+              Save
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <AlertDialogContent className="sm:max-w-sm">
           <AlertDialogHeader>
