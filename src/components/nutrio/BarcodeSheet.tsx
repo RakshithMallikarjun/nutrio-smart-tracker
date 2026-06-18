@@ -87,10 +87,12 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
           formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "qr_code"],
         });
         const tick = async () => {
+          if (scannedRef.current) return;
           if (!videoRef.current || !streamRef.current) return;
           try {
             const codes = await detector.detect(videoRef.current);
-            if (codes[0]?.rawValue) {
+            if (codes[0]?.rawValue && !scannedRef.current) {
+              scannedRef.current = true;
               stop();
               lookup(codes[0].rawValue);
               return;
@@ -104,7 +106,8 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
         const reader = new BrowserMultiFormatReader();
         zxingRef.current = reader;
         reader.decodeFromVideoElement(videoRef.current!, (result) => {
-          if (result) {
+          if (result && !scannedRef.current) {
+            scannedRef.current = true;
             const text = result.getText();
             stop();
             lookup(text);
@@ -118,6 +121,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
   };
 
   const lookup = async (barcode: string) => {
+    if (loading) return;
     setCode(barcode);
     setLoading(true);
     setNotFound(false);
