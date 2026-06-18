@@ -181,7 +181,6 @@ function Dashboard() {
     { icon: <Mic size={18} />, label: "Voice log", onClick: () => { setVoiceOpen(true); track("voice_log_opened"); } },
     { icon: <Camera size={18} />, label: "Scan dish", onClick: () => { setAiOpen(true); track("ai_scan_opened"); } },
     { icon: <ScanBarcode size={18} />, label: "Barcode", onClick: () => { setBarcodeOpen(true); track("barcode_opened"); } },
-    { icon: <Copy size={18} />, label: "Copy prev.", onClick: () => { setCopyMeal(autoMeal()); track("copy_yesterday_opened", { source: "quick_action" }); } },
   ];
 
   return (
