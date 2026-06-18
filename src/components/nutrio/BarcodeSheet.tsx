@@ -16,6 +16,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const zxingRef = useRef<any>(null);
+  const scannedRef = useRef(false);
   const [supported, setSupported] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,6 +31,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
   useEffect(() => {
     if (!open) return;
     setMeal(defaultMeal);
+    scannedRef.current = false;
     setSupported(typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia);
     return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -51,6 +53,7 @@ export function BarcodeSheet({ open, onClose, defaultMeal, onAdd }: Props) {
     setNotFound(false);
     setManual("");
     setLoading(false);
+    scannedRef.current = false;
   };
 
   const start = async () => {
