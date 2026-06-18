@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Flame, Mic, Camera, ScanBarcode, Copy, Plus, LogOut, Loader2, Pencil, Trash2 } from "lucide-react";
+import { BmiCard } from "@/components/nutrio/BmiCard";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { useStreak } from "@/hooks/use-streak";
@@ -94,13 +96,23 @@ function Dashboard() {
   const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [heightCm, setHeightCm] = useState<number | null>(null);
+  const [targetBmi, setTargetBmi] = useState<number | null>(null);
+  const [bmiEditOpen, setBmiEditOpen] = useState(false);
+  const [targetBmiDraft, setTargetBmiDraft] = useState("");
   const { logs: weightLogs } = useWeightLogs(user?.id);
 
   useEffect(() => {
     if (!user?.id) return;
-    supabase.from("profiles").select("weight_unit").eq("id", user.id).maybeSingle().then(({ data }) => {
+    supabase.from("profiles").select("weight_unit,height_cm").eq("id", user.id).maybeSingle().then(({ data }) => {
       if (data?.weight_unit === "lb" || data?.weight_unit === "kg") setWeightUnit(data.weight_unit);
+      if (data?.height_cm) setHeightCm(Number(data.height_cm));
     });
+    if (typeof window !== "undefined") {
+      const raw = window.localStorage.getItem(`nutrio:target_bmi:${user.id}`);
+      const n = raw ? Number(raw) : NaN;
+      if (Number.isFinite(n) && n >= 15 && n <= 40) setTargetBmi(n);
+    }
   }, [user?.id]);
 
   useEffect(() => {
@@ -181,7 +193,6 @@ function Dashboard() {
     { icon: <Mic size={18} />, label: "Voice log", onClick: () => { setVoiceOpen(true); track("voice_log_opened"); } },
     { icon: <Camera size={18} />, label: "Scan dish", onClick: () => { setAiOpen(true); track("ai_scan_opened"); } },
     { icon: <ScanBarcode size={18} />, label: "Barcode", onClick: () => { setBarcodeOpen(true); track("barcode_opened"); } },
-    { icon: <Copy size={18} />, label: "Copy prev.", onClick: () => { setCopyMeal(autoMeal()); track("copy_yesterday_opened", { source: "quick_action" }); } },
   ];
 
   return (
@@ -215,7 +226,6 @@ function Dashboard() {
           </div>
           <ProfileMenu
             initial={store.displayName.charAt(0).toUpperCase()}
-            onViewProfile={() => navigate({ to: "/goals" })}
             onSettings={() => navigate({ to: "/goals" })}
             onSignOut={() => setSignOutOpen(true)}
           />
@@ -271,7 +281,7 @@ function Dashboard() {
       </section>
 
       {/* 3. Quick actions row */}
-      <div className="mx-5 mt-4 grid grid-cols-4 gap-2">
+      <div className="mx-5 mt-4 grid grid-cols-3 gap-2">
         {quickAdds.map((q) => (
           <button
             key={q.label}
@@ -416,6 +426,14 @@ function Dashboard() {
         />
       </section>
 
+      {/* 6. BMI card */}
+      <BmiCard
+        heightCm={heightCm}
+        weightKg={latestWeight ?? null}
+        targetBmi={targetBmi}
+        onEditTarget={() => { setTargetBmiDraft(targetBmi ? String(targetBmi) : "22"); setBmiEditOpen(true); }}
+      />
+
       {/* Bottom nav */}
       <BottomNav
         active={activeTab}
@@ -543,6 +561,45 @@ function Dashboard() {
           }
         }}
       />
+
+      <AlertDialog open={bmiEditOpen} onOpenChange={setBmiEditOpen}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Set target BMI</AlertDialogTitle>
+            <AlertDialogDescription>
+              Healthy range is 18.5 – 24.9. Your current height is used to compute the target weight.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            type="number"
+            inputMode="decimal"
+            min={15}
+            max={40}
+            step={0.1}
+            value={targetBmiDraft}
+            onChange={(e) => setTargetBmiDraft(e.target.value)}
+            className="rounded-xl"
+          />
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="flex-1 rounded-full py-2.5 text-sm font-extrabold">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const n = Number(targetBmiDraft);
+                if (!Number.isFinite(n) || n < 15 || n > 40) { toast.error("Enter a BMI between 15 and 40"); return; }
+                setTargetBmi(n);
+                if (user?.id && typeof window !== "undefined") {
+                  window.localStorage.setItem(`nutrio:target_bmi:${user.id}`, String(n));
+                }
+                toast.success("Target BMI saved");
+              }}
+              className="flex-1 rounded-full py-2.5 text-sm font-extrabold text-white"
+              style={{ backgroundColor: RED }}
+            >
+              Save
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <AlertDialogContent className="sm:max-w-sm">

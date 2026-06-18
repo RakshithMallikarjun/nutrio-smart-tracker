@@ -1,4 +1,4 @@
-import { User as UserIcon, Settings, LogOut } from "lucide-react";
+import { Settings, LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,12 +9,11 @@ import {
 
 type Props = {
   initial: string;
-  onViewProfile: () => void;
   onSettings: () => void;
   onSignOut: () => void;
 };
 
-export function ProfileMenu({ initial, onViewProfile, onSettings, onSignOut }: Props) {
+export function ProfileMenu({ initial, onSettings, onSignOut }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -27,9 +26,6 @@ export function ProfileMenu({ initial, onViewProfile, onSettings, onSignOut }: P
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44 rounded-xl">
-        <DropdownMenuItem onClick={onViewProfile} className="cursor-pointer gap-2 font-semibold">
-          <UserIcon size={15} /> View profile
-        </DropdownMenuItem>
         <DropdownMenuItem onClick={onSettings} className="cursor-pointer gap-2 font-semibold">
           <Settings size={15} /> Settings
         </DropdownMenuItem>
