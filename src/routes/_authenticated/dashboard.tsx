@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Flame, Mic, Camera, ScanBarcode, Copy, Plus, LogOut, Loader2, Pencil, Trash2 } from "lucide-react";
+import { BmiCard } from "@/components/nutrio/BmiCard";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useNutrioCloud } from "@/hooks/use-nutrio-cloud";
 import { useStreak } from "@/hooks/use-streak";
