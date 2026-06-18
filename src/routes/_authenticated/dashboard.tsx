@@ -215,7 +215,6 @@ function Dashboard() {
           </div>
           <ProfileMenu
             initial={store.displayName.charAt(0).toUpperCase()}
-            onViewProfile={() => navigate({ to: "/goals" })}
             onSettings={() => navigate({ to: "/goals" })}
             onSignOut={() => setSignOutOpen(true)}
           />
